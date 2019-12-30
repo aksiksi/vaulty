@@ -1,0 +1,9 @@
+# Cargo/Rust
+target/
+Cargo.lock
+**/*.rs.bk
+
+# Vagrant
+.vagrant/
+
+# Python

@@ -1,0 +1,9 @@
+[package]
+name = "massu-filter"
+version = "0.1.0"
+authors = ["Assil Ksiksi <cyph0nik@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+mailparse = "0.10.1"
+clap = "2.33.0"
