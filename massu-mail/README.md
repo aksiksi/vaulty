@@ -6,9 +6,9 @@ Backend code that handles everything related to mail.  All tools in this directo
 
 A Postfix filter that is triggered upon receipt of an email.  The filter is optimized for speed in order to minimize time spent in the Postfix queue.
 
-As soon as the required checks are done (if any), the filter forwards the email info to `massu-svr` and terminates.
+As soon as the required checks are done (if any), the filter forwards the email info to `massu-mgr` and terminates.
 
-## massu-svr
+## massu-mgr
 
 A simple HTTP server that listens for incoming mail from `massu-filter`.  The bulk of the mail handling logic is done here.
 

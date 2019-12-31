@@ -1,7 +1,8 @@
 [package]
-name = "massu-svr"
+name = "massu-mgr"
 version = "0.1.0"
 authors = ["Assil Ksiksi <cyph0nik@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+rouille = "3.0.0"
