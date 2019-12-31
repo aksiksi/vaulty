@@ -6,9 +6,28 @@ use hyper::{Body, Client, Request};
 // TODO: Put this in a config file
 static MGR_HOST: &str = "mgr.massu.com";
 
+async fn transmit_email(receiver: String, sender: String,
+                        email: String) {
+    // Send information to mgr server via API
+    let client = Client::new();
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("http://httpbin.org/post")
+        .body(Body::from(email))
+        .expect("Failed to build request");
+
+    let future = client.request(req);
+    let resp = future.await.expect("Failed request!");
+
+    assert!(resp.status().is_success());
+
+    let body = hyper::body::to_bytes(resp.into_body()).await.unwrap();
+    println!("{:?}", body);
+}
+
 #[tokio::main]
 async fn main() {
-// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = App::new("massu-filter")
                   .version("1.0")
                   .author("Assil Ksiksi")
@@ -38,20 +57,6 @@ async fn main() {
     std::io::stdin().read_to_string(&mut email)
                     .expect("Failed to read email body from stdin!");
 
-    // Send information to mgr server via API
-    let client = Client::new();
-
-    let req = Request::builder()
-        .method("POST")
-        .uri("http://httpbin.org/post")
-        .body(Body::from(email))
-        .expect("Failed to build request");
-
-    let future = client.request(req);
-    let resp = future.await.unwrap();
-
-    assert!(resp.status().is_success());
-
-    // let body = hyper::body::to_bytes(resp.into_body()).await.unwrap();
-    // println!("{:?}", body);
+    let future = transmit_email(String::from(receiver_address),
+                                String::from(sender_address), email).await;
 }
