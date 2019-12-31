@@ -1,38 +1,57 @@
-use std::fs::{OpenOptions};
-use std::io::{Read, Write};
-use std::path::Path;
+use std::io::{Read};
 
 use clap::{Arg, App};
+use hyper::{Body, Client, Request};
 
-fn main() -> std::io::Result<()> {
-    let path = Path::new("/tmp/emails.txt");
+// TODO: Put this in a config file
+static MGR_HOST: &str = "mgr.massu.com";
 
-    let matches = App::new("Test")
+#[tokio::main]
+async fn main() {
+// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let matches = App::new("massu-filter")
                   .version("1.0")
-                  .arg(Arg::with_name("r")
+                  .author("Assil Ksiksi")
+                  .arg(Arg::with_name("receiver")
+                       .short("r")
+                       .long("receiver")
                        .required(true)
+                       .help("Receiver email address")
+                       .value_name("EMAIL")
                        .takes_value(true))
-                  .arg(Arg::with_name("s")
+                  .arg(Arg::with_name("sender")
+                       .short("s")
+                       .long("sender")
                        .required(true)
+                       .help("Sender email address")
+                       .value_name("EMAIL")
                        .takes_value(true))
                   .get_matches();
 
-    let recipient = matches.value_of("r").unwrap();
-    let sender = matches.value_of("s").unwrap();
+    let receiver_address = matches.value_of("receiver").unwrap();
+    let sender_address = matches.value_of("sender").unwrap();
 
-    println!("Recipient: {}, Sender: {}", recipient, sender);
+    println!("Receiver: {}, Sender: {}", receiver_address, sender_address);
 
     // Get message body from stdin
-    let mut message = String::new();
-    std::io::stdin().read_to_string(&mut message)?;
+    let mut email = String::new();
+    std::io::stdin().read_to_string(&mut email)
+                    .expect("Failed to read email body from stdin!");
 
-    let mut file = OpenOptions::new()
-                       .append(true)
-                       .create(true)
-                       .open(path)?;
+    // Send information to mgr server via API
+    let client = Client::new();
 
-    file.write_all(format!("{} -> {}\n", sender, recipient).as_bytes())?;
-    file.write_all(message.as_bytes())?;
+    let req = Request::builder()
+        .method("POST")
+        .uri("http://httpbin.org/post")
+        .body(Body::from(email))
+        .expect("Failed to build request");
 
-    Ok(())
+    let future = client.request(req);
+    let resp = future.await.unwrap();
+
+    assert!(resp.status().is_success());
+
+    // let body = hyper::body::to_bytes(resp.into_body()).await.unwrap();
+    // println!("{:?}", body);
 }

@@ -7,3 +7,5 @@ edition = "2018"
 [dependencies]
 mailparse = "0.10.1"
 clap = "2.33.0"
+hyper = "0.13.1"
+tokio = { version = "0.2.6", features = ["full"] }
