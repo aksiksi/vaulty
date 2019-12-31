@@ -1,4 +1,5 @@
 mod controllers;
+mod mail;
 mod router;
 
 fn main() {
