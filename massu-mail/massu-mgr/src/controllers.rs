@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use super::mail;
+use super::email;
 
 pub fn index(request: &rouille::Request) -> rouille::Response {
     rouille::Response::text("Hello, world!")
@@ -25,7 +25,7 @@ pub fn mailgun(request: &rouille::Request) -> rouille::Response {
     };
 
     // Parse mail based on content-type
-    let mail = match mail::Mail::from_body(&body, &content_type) {
+    let mail = match email::Email::from_body(&body, &content_type) {
         Ok(m) => m,
         Err(e) => return rouille::Response::text(e.to_string()).with_status_code(500)
     };

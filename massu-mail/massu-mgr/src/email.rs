@@ -3,7 +3,7 @@ use std::default::Default;
 use serde::{Deserialize};
 
 #[derive(Deserialize, Debug, Default)]
-pub struct Mail {
+pub struct Email {
     sender: String,
     recipient: String,
     subject: String,
@@ -24,15 +24,17 @@ pub struct Attachment {
     size: usize,
 }
 
-impl Mail {
+/// Represents a single email
+impl Email {
     pub fn new() -> Self {
         Default::default()
     }
 
     pub fn from_body(body: &str, content_type: &str) ->
-        Result<Mail, Box<dyn std::error::Error>> {
+        Result<Self, Box<dyn std::error::Error>> {
         if content_type == "application/x-www-form-urlencoded" {
-            let mut mail: Self = Default::default();
+            let mut mail = Self::new();
+
             let parsed = url::form_urlencoded::parse(body.as_bytes())
                                               .into_owned();
 
@@ -62,6 +64,7 @@ impl Mail {
     }
 }
 
+/// Represents a single email attachment
 impl Attachment {
     /// Converts attachments from `[{"url": ..., }]` to a struct.
     pub fn from_raw_json(attachments: &str)
