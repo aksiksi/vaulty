@@ -1,0 +1,13 @@
+---
+- name: Setup webserver
+  hosts: webservers
+  tasks:
+    # - name: Install nginx
+    #   apt:
+    #     name: nginx
+    #     state: present
+    - name: Copy massu-mgr to /usr/bin
+      copy:
+        src: massu-mail/massu-mgr/target/release/massu-mgr
+        dest: /usr/bin
+        mode: u=rwx,g=rwx,o=rwx
