@@ -57,6 +57,8 @@ async fn main() {
     std::io::stdin().read_to_string(&mut email)
                     .expect("Failed to read email body from stdin!");
 
-    let future = transmit_email(String::from(receiver_address),
-                                String::from(sender_address), email).await;
+    // Send out the email info to remote server
+    // TODO: Do all processing in massu_filter
+    transmit_email(String::from(receiver_address),
+                   String::from(sender_address), email).await;
 }

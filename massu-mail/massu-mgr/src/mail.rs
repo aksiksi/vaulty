@@ -1,6 +1,8 @@
+use std::default::Default;
+
 use serde::{Deserialize};
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct Mail {
     sender: String,
     recipient: String,
@@ -10,7 +12,7 @@ pub struct Mail {
     attachments: Option<Vec<Attachment>>
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct Attachment {
     // Attachment can either contain the full content,
     // or a URL that points to the content
@@ -22,14 +24,48 @@ pub struct Attachment {
     size: usize,
 }
 
-// impl Mail {
-//     fn get_attachments(&self) -> &Vec<Attachment> {
-//         for &attachment in self.attachments {
-//             if let Some(attachment.url) = url {
-//                 // Fetch remote content and fill it in
-//             }
-//         }
+impl Mail {
+    pub fn new() -> Self {
+        Default::default()
+    }
 
-//         &self.attachments
-//     }
-// }
+    pub fn from_body(body: &str, content_type: &str) ->
+        Result<Mail, Box<dyn std::error::Error>> {
+        if content_type == "application/x-www-form-urlencoded" {
+            let mut mail: Self = Default::default();
+            let parsed = url::form_urlencoded::parse(body.as_bytes())
+                                              .into_owned();
+
+            for (k, v) in parsed {
+                if k == "sender" {
+                    mail.sender = v;
+                } else if k == "recipient" {
+                    mail.recipient = v;
+                } else if k == "subject" {
+                    mail.subject = v;
+                } else if k == "body-html" {
+                    mail.body = v;
+                } else if k == "attachments" {
+                    mail.attachments = Some(Attachment::from_raw_json(&v)?);
+                }
+            }
+
+            Ok(mail)
+        } else if content_type == "application/json" {
+            match serde_json::from_str::<Self>(body) {
+                Ok(m) => Ok(m),
+                Err(e) => Err(e.into())
+            }
+        } else {
+            Err(format!("Unknown content type: {}", content_type).into())
+        }
+    }
+}
+
+impl Attachment {
+    /// Converts attachments from `[{"url": ..., }]` to a struct.
+    pub fn from_raw_json(attachments: &str)
+        -> Result<Vec<Attachment>, serde_json::Error> {
+        serde_json::from_str(attachments)
+    }
+}
