@@ -9,7 +9,7 @@ pub fn handle_request(request: &rouille::Request) -> rouille::Response {
         },
 
         (POST) (/mailgun) => {
-            controllers::mailgun(&request)
+            controllers::mailgun_post(&request)
         },
 
         _ => rouille::Response::empty_404()
