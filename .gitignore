@@ -7,3 +7,6 @@ Cargo.lock
 .vagrant/
 
 # Python
+
+# Misc
+tmp/
