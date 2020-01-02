@@ -126,4 +126,4 @@ mailman   unix  -       n       n       -       -       pipe
 # Custom mail filter
 filter    unix  -       n       n       -       10      pipe
     flags=Rq user=vmail null_sender=
-    argv=/etc/postfix/filters/massu-filter -r ${recipient} -s ${sender}
+    argv=/etc/postfix/filters/vaulty_filter -r ${recipient} -s ${sender}

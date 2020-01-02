@@ -3,9 +3,6 @@ use std::io::{Read};
 use clap::{Arg, App};
 use hyper::{Body, Client, Request};
 
-// TODO: Put this in a config file
-static MGR_HOST: &str = "mgr.massu.com";
-
 async fn transmit_email(receiver: String, sender: String,
                         email: String) {
     // Send information to mgr server via API
@@ -28,7 +25,7 @@ async fn transmit_email(receiver: String, sender: String,
 
 #[tokio::main]
 async fn main() {
-    let matches = App::new("massu-filter")
+    let matches = App::new("vaulty_filter")
                   .version("1.0")
                   .author("Assil Ksiksi")
                   .arg(Arg::with_name("receiver")
@@ -58,7 +55,7 @@ async fn main() {
                     .expect("Failed to read email body from stdin!");
 
     // Send out the email info to remote server
-    // TODO: Do all processing in massu_filter
+    // TODO: Do all processing in vaulty_filter
     transmit_email(String::from(receiver_address),
                    String::from(sender_address), email).await;
 }

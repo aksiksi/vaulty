@@ -6,8 +6,8 @@
     #   apt:
     #     name: nginx
     #     state: present
-    - name: Copy massu-mgr to /usr/bin
+    - name: Copy vaulty_mgr to /usr/bin
       copy:
-        src: massu-mail/massu-mgr/target/release/massu-mgr
+        src: vaulty-mail/target/release/vaulty_mgr
         dest: /usr/bin
         mode: u=rwx,g=rwx,o=rwx

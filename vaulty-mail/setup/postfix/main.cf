@@ -29,7 +29,7 @@ myhostname = jesse.vagrant.com
 alias_maps = hash:/etc/aliases
 alias_database = hash:/etc/aliases
 myorigin = /etc/mailname
-mydestination = mail.massu.com, jessie.vagrantup.com, localhost.vagrantup.com, localhost
+mydestination = mail.vaulty.net, jessie.vagrantup.com, localhost.vagrantup.com, localhost
 relayhost = 
 mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128 172.0.0.0/8 192.168.0.0/16
 mailbox_command = procmail -a "$EXTENSION"
@@ -40,7 +40,7 @@ default_transport = error
 relay_transport = error
 
 # Virtual mailbox config
-virtual_mailbox_domains = massu.com
+virtual_mailbox_domains = vaulty.net
 virtual_mailbox_base = /var/vmail
 virtual_mailbox_maps = hash:/etc/postfix/vmail
 #virtual_alias_maps = hash:/etc/postfix/virtual
