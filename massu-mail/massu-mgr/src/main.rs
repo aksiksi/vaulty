@@ -9,7 +9,8 @@ fn main() {
 
     log::info!("Starting server...");
 
-    rouille::start_server("0.0.0.0:7777", move |request| {
+    // Pool of 8 * NUM_CPU threads
+    rouille::start_server_with_pool("0.0.0.0:7777", None, move |request| {
         router::handle_request(&request)
     });
 }
