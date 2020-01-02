@@ -117,8 +117,8 @@ impl vaulty_lib::email::Email for Email {
 /// Represents a single email attachment
 impl Attachment {
     /// Creates a Vec of attachments from `[{"url": ..., }]`
-    pub fn from_raw_json(attachments: &str) -> Result<Vec<Attachment>, serde_json::Error> {
-        serde_json::from_str(attachments)
+    pub fn from_raw_json(attachments: &str) -> Result<Vec<Attachment>, Box<dyn std::error::Error>> {
+        serde_json::from_str(attachments).map_err(|e| e.into())
     }
 
     /// If the attachment has a URL but no content, grab the attachment
