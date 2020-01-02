@@ -23,8 +23,8 @@ pub struct Email {
 pub struct Attachment {
     // Attachment can either contain the full content,
     // or a URL that points to the content
-    pub content: Option<Vec<u8>>,
-    pub url: Option<String>,
+    pub content: Vec<u8>,
+    pub url: String,
     #[serde(rename = "content-type")]
     content_type: String,
     name: String,
@@ -77,10 +77,7 @@ impl Email {
 
         for attachment in &mut self.attachments {
             if attachment.fetch().is_err() {
-                log::error!(
-                    "Failed to fetch attachment: {}",
-                    attachment.url.as_ref().unwrap()
-                );
+                log::error!("Failed to fetch attachment: {}", attachment.url);
                 failed = true;
             }
         }
@@ -90,6 +87,30 @@ impl Email {
         } else {
             Ok(&self.attachments)
         }
+    }
+}
+
+impl vaulty_lib::email::Email for Email {
+    type Attachment = Attachment;
+
+    fn get_recipient(&self) -> &str {
+        &self.recipient
+    }
+
+    fn get_sender(&self) -> &str {
+        &self.sender
+    }
+
+    fn get_subject(&self) -> &str {
+        &self.subject
+    }
+
+    fn get_body(&self) -> &str {
+        &self.body
+    }
+
+    fn get_attachments(&self) -> &Vec<Attachment> {
+        &self.attachments
     }
 }
 
@@ -103,25 +124,39 @@ impl Attachment {
     /// If the attachment has a URL but no content, grab the attachment
     /// content. Data is filled into the current struct.
     pub fn fetch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if self.content.is_some() {
+        if self.content.len() > 0 {
             return Ok(());
         }
 
         let api_key = std::env::var("MAILGUN_API_KEY");
         let client = Client::new();
 
-        let url = self.url.as_ref().unwrap();
         let mut resp = client
-            .get(reqwest::Url::parse(url)?)
+            .get(reqwest::Url::parse(&self.url)?)
             .basic_auth("api", api_key.ok())
             .send()?
             .error_for_status()?;
 
-        let mut buf: Vec<u8> = Vec::new();
-        resp.read_to_end(&mut buf)?;
-
-        self.content = Some(buf);
+        resp.read_to_end(&mut self.content)?;
 
         Ok(())
+    }
+}
+
+impl vaulty_lib::email::Attachment for Attachment {
+    fn get_content(&self) -> &Vec<u8> {
+        &self.content
+    }
+
+    fn get_content_type(&self) -> &str {
+        &self.content_type
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    fn get_size(&self) -> usize {
+        self.size
     }
 }
