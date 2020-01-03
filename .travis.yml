@@ -1,16 +1,13 @@
+language: rust
 jobs:
   allow_failures:
     - rust: nightly
   fast_finish: true
   include:
     - language: rust
-      rust:
-        - stable
-        - beta
-        - nightly
       before_script:
         - cd vaulty-mail
       script:
-        - cargo build --release
+        - cargo build
         - cargo test
       cache: cargo
