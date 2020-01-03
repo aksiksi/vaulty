@@ -30,17 +30,26 @@ pub fn mailgun_post(request: &Request) -> Response {
 
     let mut mail = match mailgun::Email::from_body(&body, &content_type) {
         Ok(m) => m,
-        Err(e) => return Response::text(e.to_string()).with_status_code(500),
+        Err(e) => {
+            log::error!("{:?}", e);
+            return Response::text(e.to_string()).with_status_code(500);
+        }
     };
 
-    log::info!("{:?}", mail);
-
-    let _attachments = match mail.fetch_attachments() {
-        Ok(v) => v,
-        Err(e) => return Response::text(e.to_string()).with_status_code(500),
+    if let Err(e) = mail.fetch_attachments() {
+        return Response::text(e.to_string()).with_status_code(500);
     };
 
     log::info!("Fetched all attachments successfully!");
+
+    let mut handler = vaulty_lib::EmailHandler::new();
+    let email: vaulty_lib::email::Email = mail.into();
+
+    log::info!("Uploaded {} attachments to Dropbox", email.attachments.len());
+
+    if let Err(e) = handler.handle(email) {
+        return Response::text(e.to_string()).with_status_code(500);
+    }
 
     Response::text("Success")
 }

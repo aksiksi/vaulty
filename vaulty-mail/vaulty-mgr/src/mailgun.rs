@@ -24,7 +24,7 @@ pub struct Email {
 pub struct Attachment {
     // Attachment can either contain the full content,
     // or a URL that points to the content
-    pub content: Vec<u8>,
+    pub content: Option<Vec<u8>>,
     pub url: String,
     #[serde(rename = "content-type")]
     content_type: String,
@@ -73,7 +73,7 @@ impl Email {
 
     /// Fetch all attachments associated with this email
     /// Attachments are fetched once
-    pub fn fetch_attachments(&mut self) -> Result<&Vec<Attachment>, Box<dyn std::error::Error>> {
+    pub fn fetch_attachments(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut failed = false;
 
         for attachment in &mut self.attachments {
@@ -86,7 +86,7 @@ impl Email {
         if failed {
             Err("One or more attachments failed!".into())
         } else {
-            Ok(&self.attachments)
+            Ok(())
         }
     }
 }
@@ -108,13 +108,14 @@ impl From<Email> for vaulty_lib::email::Email {
 impl Attachment {
     /// Creates a Vec of attachments from `[{"url": ..., }]`
     pub fn from_raw_json(attachments: &str) -> Result<Vec<Attachment>, Box<dyn std::error::Error>> {
+        log::info!("{:?}", attachments);
         serde_json::from_str(attachments).map_err(|e| e.into())
     }
 
     /// If the attachment has a URL but no content, grab the attachment
     /// content. Data is filled into the current struct.
     pub fn fetch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if self.content.len() > 0 {
+        if self.content.is_some() {
             return Ok(());
         }
 
@@ -127,7 +128,10 @@ impl Attachment {
             .send()?
             .error_for_status()?;
 
-        resp.read_to_end(&mut self.content)?;
+        let mut buf = Vec::new();
+        resp.read_to_end(&mut buf)?;
+
+        self.content = Some(buf);
 
         Ok(())
     }
@@ -136,7 +140,7 @@ impl Attachment {
 impl From<Attachment> for vaulty_lib::email::Attachment {
     fn from(attachment: Attachment) -> vaulty_lib::email::Attachment {
         vaulty_lib::email::Attachment {
-            data: attachment.content,
+            data: attachment.content.unwrap(),
             content_type: attachment.content_type,
             name: attachment.name,
             size: attachment.size,

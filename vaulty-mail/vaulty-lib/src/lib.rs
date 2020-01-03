@@ -13,11 +13,16 @@ impl EmailHandler {
     pub fn new() -> Self {
         Self {
             dropbox_client: dropbox::Client::new(),
+            // TODO: Figure out user's date from email
+            // Will be used for naming scrapbook entries
             date: Utc::today().format("%F").to_string(),
         }
     }
 
-    pub fn handle(&mut self, _email: email::Email) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn handle(&mut self, email: email::Email) -> Result<(), Box<dyn std::error::Error>> {
+        log::info!("Handling mail for {}", email.recipient);
+        log::info!("Date in UTC: {}", self.date);
+
         // 1. Figure out if user is valid and active
         // TODO: PGSQL lookup
 
@@ -25,15 +30,22 @@ impl EmailHandler {
         // NOTE: Assume the path exists
         let dropbox_token = std::env::var("DROPBOX_TOKEN").unwrap();
         self.dropbox_client.set_token(&dropbox_token);
-        let _storage_path = "/abcd";
+        let storage_path = "/vaulty";
 
         // 3. Check what user has configured
         // - Attachments only vs. email content
         // - Create a folder for each day
         // etc.
-        println!("Date: {}", self.date);
 
-        // 4. Create day folder, if applicable
+        // 4. Write all attachments to folder via Dropbox API
+        for attachment in &email.attachments {
+            let result = self.dropbox_client.upload(format!("{}/{}", storage_path, attachment.name).as_str(),
+                                                    &attachment.data, true);
+            if let Err(_) = result {
+                log::error!("Failed to upload attachment of size = {}", attachment.size);
+            }
+        }
+
         Ok(())
     }
 }
