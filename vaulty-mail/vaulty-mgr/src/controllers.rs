@@ -4,7 +4,7 @@ use super::mailgun;
 
 use rouille::{Request, Response};
 
-pub fn index(request: &Request) -> Response {
+pub fn index(_request: &Request) -> Response {
     Response::text("Hello, world!")
 }
 
@@ -35,7 +35,7 @@ pub fn mailgun_post(request: &Request) -> Response {
 
     log::info!("{:?}", mail);
 
-    let attachments = match mail.fetch_attachments() {
+    let _attachments = match mail.fetch_attachments() {
         Ok(v) => v,
         Err(e) => return Response::text(e.to_string()).with_status_code(500),
     };

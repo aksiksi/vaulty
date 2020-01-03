@@ -4,7 +4,7 @@ use std::fmt;
 use reqwest::blocking;
 use reqwest::StatusCode;
 
-use serde::{Serialize, Deserialize};
+use serde::Deserialize;
 
 pub const DROPBOX_ARG_HEADER: &str = "Dropbox-API-Arg";
 pub const DROPBOX_BASE_API: &str = "https://api.dropboxapi.com/2/";
@@ -51,27 +51,56 @@ impl Error {
 
 pub enum Endpoint {
     ListFolder,
-    FileUpload,
     CreateFolder,
+    FileUpload,
+    Search,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(tag = ".tag")]
+pub enum SearchResultEntry {
+    #[serde(rename = "folder")]
+    Folder {
+        name: String,
+        path_lower: String,
+        path_display: String,
+        id: String,
+    },
+    #[serde(rename = "file")]
+    File {
+        name: String,
+        id: String,
+        size: usize,
+        server_modified: String,
+        path_lower: String,
+        path_display: String,
+        content_hash: String,
+    },
+}
+
+#[derive(Deserialize, Debug)]
+pub struct SearchResultSingle {
+    metadata: SearchResultEntry,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct SearchResult {
+    pub matches: Vec<SearchResultSingle>,
+    pub more: bool,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct ListFolderResult {
-    entries: Vec<ListFolderEntry>,
-    has_more: bool,
+    pub entries: Vec<SearchResultEntry>,
+    pub has_more: bool,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct ListFolderEntry {
-    #[serde(rename = ".tag")]
-    tag: String,
-    name: String,
-    path_lower: String,
-    path_display: String,
-    id: String,
+pub struct CreateFolderResult {
+    pub name: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct FileUploadResult {
     name: String,
     id: String,
@@ -82,16 +111,12 @@ pub struct FileUploadResult {
     content_hash: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateFolderResult {
-    name: String,
-}
-
 #[inline]
 pub fn build_endpoint_url(endpoint: Endpoint) -> String {
     match endpoint {
         Endpoint::ListFolder => format!("{}{}", DROPBOX_BASE_API, "files/list_folder"),
         Endpoint::CreateFolder => format!("{}{}", DROPBOX_BASE_API, "files/create_folder_v2"),
         Endpoint::FileUpload => format!("{}{}", DROPBOX_BASE_CONTENT, "files/upload"),
+        Endpoint::Search => format!("{}{}", DROPBOX_BASE_API, "files/search"),
     }
 }

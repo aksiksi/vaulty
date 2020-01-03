@@ -1,3 +1,4 @@
+use std::convert::From;
 use std::default::Default;
 use std::io::Read;
 
@@ -90,27 +91,16 @@ impl Email {
     }
 }
 
-impl vaulty_lib::email::Email for Email {
-    type Attachment = Attachment;
-
-    fn get_recipient(&self) -> &str {
-        &self.recipient
-    }
-
-    fn get_sender(&self) -> &str {
-        &self.sender
-    }
-
-    fn get_subject(&self) -> &str {
-        &self.subject
-    }
-
-    fn get_body(&self) -> &str {
-        &self.body
-    }
-
-    fn get_attachments(&self) -> &Vec<Attachment> {
-        &self.attachments
+impl From<Email> for vaulty_lib::email::Email {
+    fn from(email: Email) -> vaulty_lib::email::Email {
+        vaulty_lib::email::Email {
+            sender: email.sender,
+            recipient: email.recipient,
+            subject: email.subject,
+            body: email.body,
+            // NOTE: We use into_iter() here to *move* all elements over
+            attachments: email.attachments.into_iter().map(|a| a.into()).collect(),
+        }
     }
 }
 
@@ -143,20 +133,13 @@ impl Attachment {
     }
 }
 
-impl vaulty_lib::email::Attachment for Attachment {
-    fn get_content(&self) -> &Vec<u8> {
-        &self.content
-    }
-
-    fn get_content_type(&self) -> &str {
-        &self.content_type
-    }
-
-    fn get_name(&self) -> &str {
-        &self.name
-    }
-
-    fn get_size(&self) -> usize {
-        self.size
+impl From<Attachment> for vaulty_lib::email::Attachment {
+    fn from(attachment: Attachment) -> vaulty_lib::email::Attachment {
+        vaulty_lib::email::Attachment {
+            data: attachment.content,
+            content_type: attachment.content_type,
+            name: attachment.name,
+            size: attachment.size,
+        }
     }
 }

@@ -3,7 +3,7 @@ use std::io::{Read};
 use clap::{Arg, App};
 use hyper::{Body, Client, Request};
 
-async fn transmit_email(receiver: String, sender: String,
+async fn transmit_email(_recipient: String, _sender: String,
                         email: String) {
     // Send information to mgr server via API
     let client = Client::new();
@@ -28,9 +28,9 @@ async fn main() {
     let matches = App::new("vaulty_filter")
                   .version("1.0")
                   .author("Assil Ksiksi")
-                  .arg(Arg::with_name("receiver")
+                  .arg(Arg::with_name("recipient")
                        .short("r")
-                       .long("receiver")
+                       .long("recipient")
                        .required(true)
                        .help("Receiver email address")
                        .value_name("EMAIL")
@@ -44,10 +44,10 @@ async fn main() {
                        .takes_value(true))
                   .get_matches();
 
-    let receiver_address = matches.value_of("receiver").unwrap();
+    let recipient_address = matches.value_of("recipient").unwrap();
     let sender_address = matches.value_of("sender").unwrap();
 
-    println!("Receiver: {}, Sender: {}", receiver_address, sender_address);
+    println!("Receiver: {}, Sender: {}", recipient_address, sender_address);
 
     // Get message body from stdin
     let mut email = String::new();
@@ -56,6 +56,6 @@ async fn main() {
 
     // Send out the email info to remote server
     // TODO: Do all processing in vaulty_filter
-    transmit_email(String::from(receiver_address),
+    transmit_email(String::from(recipient_address),
                    String::from(sender_address), email).await;
 }
