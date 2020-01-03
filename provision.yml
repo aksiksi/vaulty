@@ -6,8 +6,8 @@
     #   apt:
     #     name: nginx
     #     state: present
-    - name: Copy vaulty_mgr to /usr/bin
+    - name: Copy vaulty_server to /usr/bin
       copy:
-        src: vaulty-mail/target/release/vaulty_mgr
+        src: vaulty-mail/target/release/vaulty_server
         dest: /usr/bin
         mode: u=rwx,g=rwx,o=rwx

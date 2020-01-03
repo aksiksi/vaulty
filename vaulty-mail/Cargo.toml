@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "vaulty-filter",
-    "vaulty-mgr",
-    "vaulty-lib",
+    "filter",
+    "server",
+    "lib",
 ]

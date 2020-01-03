@@ -91,9 +91,9 @@ impl Email {
     }
 }
 
-impl From<Email> for vaulty_lib::email::Email {
-    fn from(email: Email) -> vaulty_lib::email::Email {
-        vaulty_lib::email::Email {
+impl From<Email> for crate::email::Email {
+    fn from(email: Email) -> crate::email::Email {
+        crate::email::Email {
             sender: email.sender,
             recipient: email.recipient,
             subject: email.subject,
@@ -137,9 +137,9 @@ impl Attachment {
     }
 }
 
-impl From<Attachment> for vaulty_lib::email::Attachment {
-    fn from(attachment: Attachment) -> vaulty_lib::email::Attachment {
-        vaulty_lib::email::Attachment {
+impl From<Attachment> for crate::email::Attachment {
+    fn from(attachment: Attachment) -> crate::email::Attachment {
+        crate::email::Attachment {
             data: attachment.content.unwrap(),
             content_type: attachment.content_type,
             name: attachment.name,

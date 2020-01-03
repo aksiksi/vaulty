@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use super::mailgun;
+use vaulty::mailgun;
 
 use rouille::{Request, Response};
 
@@ -42,8 +42,8 @@ pub fn mailgun_post(request: &Request) -> Response {
 
     log::info!("Fetched all attachments successfully!");
 
-    let mut handler = vaulty_lib::EmailHandler::new();
-    let email: vaulty_lib::email::Email = mail.into();
+    let mut handler = vaulty::EmailHandler::new();
+    let email: vaulty::email::Email = mail.into();
 
     log::info!("Uploaded {} attachments to Dropbox", email.attachments.len());
 

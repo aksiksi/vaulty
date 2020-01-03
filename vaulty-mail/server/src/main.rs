@@ -1,5 +1,4 @@
 mod controllers;
-mod mailgun;
 mod router;
 
 fn main() {

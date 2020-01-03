@@ -1,5 +1,5 @@
 [package]
-name = "vaulty_mgr"
+name = "vaulty_server"
 version = "0.1.0"
 authors = ["Assil Ksiksi <cyph0nik@gmail.com>"]
 edition = "2018"
@@ -13,4 +13,4 @@ reqwest = { version = "0.10.0", features = ["blocking"] }
 env_logger = "0.7.1"
 log = "0.4.8"
 # tokio = { version = "0.2.6", features = ["full"] }
-vaulty_lib = { path = "../vaulty-lib" }
+vaulty = { path = "../lib" }

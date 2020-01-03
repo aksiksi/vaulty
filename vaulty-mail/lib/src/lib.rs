@@ -2,6 +2,7 @@ use chrono::offset::Utc;
 
 pub mod dropbox;
 pub mod email;
+pub mod mailgun;
 
 pub struct EmailHandler {
     dropbox_client: dropbox::Client,
