@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "filter",
     "server",
     "lib",
 ]
