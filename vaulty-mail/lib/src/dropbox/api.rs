@@ -1,7 +1,6 @@
 use std::error;
 use std::fmt;
 
-use reqwest::blocking;
 use reqwest::StatusCode;
 
 use serde::Deserialize;
@@ -35,8 +34,8 @@ impl error::Error for Error {}
 
 impl Error {
     /// Map possible Dropbox API errors
-    pub fn map_status(resp: blocking::Response)
-        -> Result<blocking::Response, Self> {
+    pub fn map_status(resp: reqwest::Response)
+        -> Result<reqwest::Response, Self> {
         let status = resp.status();
         match status {
             StatusCode::OK => Ok(resp),
