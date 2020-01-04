@@ -5,7 +5,6 @@ pub mod email;
 pub mod mailgun;
 
 pub struct EmailHandler {
-    dropbox_client: dropbox::Client,
     date: String,
     // TODO: GDrive client, PGSQL client, etc.
 }
@@ -13,14 +12,13 @@ pub struct EmailHandler {
 impl EmailHandler {
     pub fn new() -> Self {
         Self {
-            dropbox_client: dropbox::Client::new(),
             // TODO: Figure out user's date from email
             // Will be used for naming scrapbook entries
             date: Utc::today().format("%F").to_string(),
         }
     }
 
-    pub fn handle(&mut self, email: email::Email) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn handle(&self, email: email::Email) -> Result<(), Box<dyn std::error::Error>> {
         log::info!("Handling mail for {}", email.recipient);
         log::info!("Date in UTC: {}", self.date);
 
@@ -30,7 +28,7 @@ impl EmailHandler {
         // 2. Get user's token and storage location
         // NOTE: Assume the path exists
         let dropbox_token = std::env::var("DROPBOX_TOKEN").unwrap();
-        self.dropbox_client.set_token(&dropbox_token);
+        let dropbox_client = dropbox::Client::from_token(dropbox_token);
         let storage_path = "/vaulty";
 
         // 3. Check what user has configured
@@ -39,9 +37,10 @@ impl EmailHandler {
         // etc.
 
         // 4. Write all attachments to folder via Dropbox API
-        for attachment in &email.attachments {
-            let result = self.dropbox_client.upload(format!("{}/{}", storage_path, attachment.name).as_str(),
-                                                    &attachment.data, true);
+        for attachment in email.attachments {
+            let file_path = format!("{}/{}", storage_path, attachment.name);
+            let result = dropbox_client.upload(&file_path, attachment.data, true).await;
+
             if let Err(_) = result {
                 log::error!("Failed to upload attachment of size = {}", attachment.size);
             }

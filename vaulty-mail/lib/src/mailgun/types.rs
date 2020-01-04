@@ -1,8 +1,5 @@
 use std::convert::From;
 use std::default::Default;
-use std::io::Read;
-
-use reqwest::blocking::Client;
 
 use serde::Deserialize;
 
@@ -73,11 +70,11 @@ impl Email {
 
     /// Fetch all attachments associated with this email
     /// Attachments are fetched once
-    pub fn fetch_attachments(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn fetch_attachments(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut failed = false;
 
         for attachment in &mut self.attachments {
-            if attachment.fetch().is_err() {
+            if attachment.fetch().await.is_err() {
                 log::error!("Failed to fetch attachment: {}", attachment.url);
                 failed = true;
             }
@@ -114,24 +111,24 @@ impl Attachment {
 
     /// If the attachment has a URL but no content, grab the attachment
     /// content. Data is filled into the current struct.
-    pub fn fetch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn fetch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.content.is_some() {
             return Ok(());
         }
 
         let api_key = std::env::var("MAILGUN_API_KEY");
-        let client = Client::new();
+        let client = reqwest::Client::new();
 
-        let mut resp = client
+        let resp = client
             .get(reqwest::Url::parse(&self.url)?)
             .basic_auth("api", api_key.ok())
-            .send()?
+            .send()
+            .await?
             .error_for_status()?;
 
-        let mut buf = Vec::new();
-        resp.read_to_end(&mut buf)?;
+        let buf = &resp.bytes().await?;
 
-        self.content = Some(buf);
+        self.content = Some(buf.to_vec());
 
         Ok(())
     }
