@@ -5,7 +5,7 @@ authors = ["Assil Ksiksi <cyph0nik@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-reqwest = { version = "0.10.0", features = ["blocking"] }
+reqwest = "0.10.0"
 serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.44"
 url = "2.1.0"
