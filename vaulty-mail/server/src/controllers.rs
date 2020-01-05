@@ -2,31 +2,77 @@ use vaulty::{email, mailgun};
 
 use warp::{Rejection, reply::Reply};
 
+use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+
 pub async fn mailgun(content_type: Option<String>, body: String) -> Result<impl Reply, Rejection> {
     if let None = content_type {
         return Err(warp::reject::not_found());
     }
 
-    let mut mail = match mailgun::Email::from_body(&body, &content_type.unwrap()) {
-        Ok(m) => m,
-        Err(e) => {
-            log::error!("{:?}", e);
-            return Err(warp::reject::not_found());
-        }
-    };
+    let content_type = content_type.unwrap();
 
-    if let Err(_e) = mail.fetch_attachments().await {
-        return Err(warp::reject::not_found());
-    };
+    let mail;
+    let attachments;
 
-    log::info!("Fetched all attachments successfully!");
+    if content_type == "application/json" {
+        mail = match mailgun::Email::from_json(&body) {
+            Ok(m) => m,
+            Err(e) => {
+                log::error!("{:?}", e);
+                return Err(warp::reject::not_found());
+            }
+        };
 
-    let handler = vaulty::EmailHandler::new();
-    let mail: email::Email = mail.into();
+        attachments = match mailgun::Attachment::from_json(&body) {
+            Ok(m) => m,
+            Err(e) => {
+                log::error!("{:?}", e);
+                return Err(warp::reject::not_found());
+            }
+        };
+    } else if content_type == "application/x-www-form-urlencoded" {
+        mail = match mailgun::Email::from_form(&body) {
+            Ok(m) => m,
+            Err(e) => {
+                log::error!("{:?}", e);
+                return Err(warp::reject::not_found());
+            }
+        };
 
-    if let Err(_e) = handler.handle(mail).await {
+        attachments = match mailgun::Attachment::from_form(&body) {
+            Ok(m) => m,
+            Err(e) => {
+                log::error!("{:?}", e);
+                return Err(warp::reject::not_found());
+            }
+        };
+    } else {
         return Err(warp::reject::not_found());
     }
+
+    let mail: email::Email = mail.into();
+    let handler = vaulty::EmailHandler::new();
+
+    let attachment_tasks =
+        attachments.into_iter()
+                   .map(|a| { a.fetch() })
+                   .collect::<FuturesUnordered<_>>()
+                   .map_ok(|a| email::Attachment::from(a))
+                   .map_ok(|a| handler.handle(&mail, Some(a)))
+                   .map_err(|_| warp::reject::not_found());
+
+    let email_task = handler.handle(&mail, None);
+    if let Err(_) = email_task.await {
+        return Err(warp::reject::not_found());
+    }
+
+    for r in &attachment_tasks.collect::<Vec<_>>().await {
+        if let Err(_) = r {
+            return Err(warp::reject::not_found());
+        }
+    }
+
+    log::info!("Fetched all attachments successfully!");
 
     log::info!("Mail handling completed");
 

@@ -7,7 +7,6 @@ pub struct Email {
     pub recipient: String,
     pub subject: String,
     pub body: String,
-    pub attachments: Vec<Attachment>,
 }
 
 #[derive(Debug)]
