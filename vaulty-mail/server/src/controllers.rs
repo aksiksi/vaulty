@@ -4,7 +4,8 @@ use warp::{Rejection, reply::Reply};
 
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
 
-pub async fn mailgun(content_type: Option<String>, body: String) -> Result<impl Reply, Rejection> {
+pub async fn mailgun(content_type: Option<String>, body: String,
+                     api_key: Option<String>) -> Result<impl Reply, Rejection> {
     if let None = content_type {
         return Err(warp::reject::not_found());
     }
@@ -55,10 +56,10 @@ pub async fn mailgun(content_type: Option<String>, body: String) -> Result<impl 
 
     let attachment_tasks =
         attachments.into_iter()
-                   .map(|a| { a.fetch() })
+                   .map(|a| a.fetch(api_key.as_ref()))
                    .collect::<FuturesUnordered<_>>()
                    .map_ok(|a| email::Attachment::from(a))
-                   .map_ok(|a| handler.handle(&mail, Some(a)))
+                   .and_then(|a| handler.handle(&mail, Some(a)))
                    .map_err(|_| warp::reject::not_found());
 
     let email_task = handler.handle(&mail, None);
@@ -66,7 +67,7 @@ pub async fn mailgun(content_type: Option<String>, body: String) -> Result<impl 
         return Err(warp::reject::not_found());
     }
 
-    for r in &attachment_tasks.collect::<Vec<_>>().await {
+    for r in attachment_tasks.collect::<Vec<_>>().await {
         if let Err(_) = r {
             return Err(warp::reject::not_found());
         }

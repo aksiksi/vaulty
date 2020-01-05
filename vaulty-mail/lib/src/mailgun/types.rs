@@ -84,7 +84,6 @@ impl Attachment {
         let parsed: HashMap<String, String> =
             url::form_urlencoded::parse(body.as_bytes()).into_owned().collect();
         let attachments_str = parsed.get("attachments").unwrap();
-
         serde_json::from_str::<Vec<Attachment>>(attachments_str).map_err(|e| e.into())
     }
 
@@ -97,17 +96,16 @@ impl Attachment {
 
     /// If the attachment has a URL but no content, grab the attachment
     /// content. Data is filled into the current struct.
-    pub async fn fetch(mut self) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn fetch(mut self, api_key: Option<&String>) -> Result<Self, Box<dyn std::error::Error>> {
         if self.content.is_some() {
             return Ok(self);
         }
 
-        let api_key = std::env::var("MAILGUN_API_KEY");
         let client = reqwest::Client::new();
 
         let resp = client
             .get(reqwest::Url::parse(&self.url)?)
-            .basic_auth("api", api_key.ok())
+            .basic_auth("api", api_key)
             .send()
             .await?
             .error_for_status()?;

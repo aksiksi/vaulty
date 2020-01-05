@@ -8,7 +8,7 @@ pub fn index() -> impl Filter<Extract = (&'static str, ), Error = Rejection> + C
 }
 
 /// Handles mail notifications from Mailgun
-pub fn mailgun() -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + Clone {
+pub fn mailgun(api_key: Option<String>) -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + Clone {
     warp::path("mailgun")
         .and(warp::path::end())
         .and(warp::body::content_length_limit(1024 * 1024 * 10))
@@ -20,5 +20,7 @@ pub fn mailgun() -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + C
                     .map_err(|_e| warp::reject::not_found())
             }
         }))
-        .and_then(controllers::mailgun)
+        .and_then(move |content_type, body| {
+            controllers::mailgun(content_type, body, api_key.clone())
+        })
 }

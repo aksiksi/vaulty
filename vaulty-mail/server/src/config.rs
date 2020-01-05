@@ -5,7 +5,7 @@ pub struct FilterArg<'a> {
 }
 
 #[derive(Debug)]
-pub struct HttpArg<'a> {
+pub struct HttpArg {
     pub port: u16,
-    pub mailgun_key: Option<&'a str>,
+    pub mailgun_key: Option<String>,
 }
