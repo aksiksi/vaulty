@@ -1,4 +1,5 @@
 mod config;
+mod controllers;
 mod filter;
 mod http;
 mod routes;
