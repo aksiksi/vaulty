@@ -1,4 +1,5 @@
 mod config;
+mod controllers;
 mod filter;
 mod http;
 mod routes;
@@ -53,10 +54,10 @@ async fn main() {
     if let Some(matches) = matches.subcommand_matches("http") {
         let arg = config::HttpArg {
             port: matches.value_of("port").unwrap().parse::<u16>().unwrap(),
-            mailgun_key: matches.value_of("mailgun_key")
+            mailgun_key: matches.value_of("mailgun_key").map(|a| a.to_string()),
         };
 
-        http::run(&arg).await;
+        http::run(arg).await;
     } else if let Some(matches) = matches.subcommand_matches("filter") {
         let arg = config::FilterArg {
             recipient: matches.value_of("recipient").unwrap(),

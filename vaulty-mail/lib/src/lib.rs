@@ -18,7 +18,8 @@ impl EmailHandler {
         }
     }
 
-    pub async fn handle(&self, email: email::Email) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn handle(&self, email: &email::Email, attachment: Option<email::Attachment>)
+        -> Result<(), Box<dyn std::error::Error>> {
         log::info!("Handling mail for {}", email.recipient);
         log::info!("Date in UTC: {}", self.date);
 
@@ -37,16 +38,20 @@ impl EmailHandler {
         // etc.
 
         // 4. Write all attachments to folder via Dropbox API
-        for attachment in email.attachments {
+        if let Some(attachment) = attachment {
             let file_path = format!("{}/{}", storage_path, attachment.name);
             let result = dropbox_client.upload(&file_path, attachment.data, true).await;
 
-            if let Err(_) = result {
+            if result.is_err() {
                 log::error!("Failed to upload attachment of size = {}", attachment.size);
             }
-        }
 
-        Ok(())
+            // Throw away the result
+            result.map(|_| ())
+        } else {
+            // Just dump the email (scrapbook mode!)
+            Ok(())
+        }
     }
 }
 
