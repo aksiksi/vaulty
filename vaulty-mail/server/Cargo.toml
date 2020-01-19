@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 vaulty = { path = "../lib" }
-warp = { git = "https://github.com/seanmonstar/warp.git" }
+warp = "0.2.0"
 tokio = { version = "0.2.6", features = ["full"] }
 env_logger = "0.7.1"
 log = "0.4.8"
