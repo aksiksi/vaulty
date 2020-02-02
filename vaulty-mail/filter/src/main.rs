@@ -1,9 +1,18 @@
 use std::io::Read;
 
-use super::config;
+use structopt::StructOpt;
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "vaulty-filter", about = "Vaulty filter for Postfix incoming mail.")]
+struct Opt {
+    #[structopt(short, long)]
+    sender: String,
+
+    #[structopt(short, long)]
+    recipient: String,
+}
 
 // Example
-// In reality, we should use the Vaulty lib
 async fn transmit_email(_recipient: String, _sender: String,
                         email: String) {
     let client = reqwest::Client::new();
@@ -20,14 +29,19 @@ async fn transmit_email(_recipient: String, _sender: String,
     println!("{}", body);
 }
 
-pub async fn filter(arg: &config::FilterArg<'_>) {
+#[tokio::main]
+async fn main() {
+    // Init logger
+    env_logger::builder().format_timestamp_micros().init();
+
+    let opt = Opt::from_args();
+
+    println!("{:?}", opt);
+
     // Get message body from stdin
     let mut email = String::new();
     std::io::stdin().read_to_string(&mut email)
                     .expect("Failed to read email body from stdin!");
 
-    // Send out the email info to remote server
-    // TODO: Do all processing in vaulty_filter
-    transmit_email(String::from(arg.recipient),
-                   String::from(arg.sender), email).await;
+    transmit_email(opt.sender, opt.recipient, email).await;
 }

@@ -1,16 +1,14 @@
 [package]
-name = "vaulty_server"
+name = "vaulty_filter"
 version = "0.1.0"
 authors = ["Assil Ksiksi <cyph0nik@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 vaulty = { path = "../lib" }
-warp = "0.2.0"
-tokio = { version = "0.2.6", features = ["full"] }
 env_logger = "0.7.1"
 log = "0.4.8"
-bytes = "0.5.3"
-clap = "2.33.0"
+structopt = "0.3.9"
 mailparse = "0.10.1"
-futures = "0.3"
+tokio = { version = "0.2.6", features = ["full"] }
+reqwest = "0.10.0"

@@ -2,4 +2,5 @@
 members = [
     "server",
     "lib",
+    "filter",
 ]
