@@ -1,31 +1,7 @@
 # Run: ansible-playbook -i ~/hosts provision.yml
 ---
-- name: Build and provision vaulty-mail
-  hosts: mailservers
-  tasks:
-    - name: Install Postfix
-      apt:
-        name: postfix
-        state: present
-    - name: Build vaulty-mail daemons
-      local_action:
-        module: shell
-        cmd: cargo build --release
-        chdir: vaulty-mail
-    - name: Copy vaulty_server to /usr/bin
-      copy:
-        src: vaulty-mail/target/release/vaulty_server
-        dest: /usr/bin
-        mode: u=rwx,g=rwx,o=rwx
-    - name: Copy vaulty_filter to /usr/bin
-      copy:
-        src: vaulty-mail/target/release/vaulty_filter
-        dest: /usr/bin
-        mode: u=rwx,g=rwx,o=rwx
-    # - name: Copy Postfix configs
-    # - name: Reload Postfix
-    # - name: Update MX servers
-
+# We need to provision vaulty-web first to ensure that DB is
+# setup and ready to go for Postfix virtual mailboxes
 - name: Provision vaulty-web
   hosts: webservers
   tasks:
@@ -49,3 +25,29 @@
       git:
         repo: 'https://github.com/aksiksi/vaulty.git'
         dest: /var/www/vaulty
+
+- name: Provision vaulty-mail
+  hosts: mailservers
+  tasks:
+    - name: Install Postfix
+      apt:
+        name: postfix
+        state: present
+    - name: Build vaulty-filter and vaulty-server (release)
+      local_action:
+        module: shell
+        cmd: cargo build --release
+        chdir: vaulty-mail
+    - name: Copy vaulty_server to /usr/bin
+      copy:
+        src: vaulty-mail/target/release/vaulty_server
+        dest: /usr/bin
+        mode: u=rwx,g=rwx,o=rwx
+    - name: Copy vaulty_filter to /usr/bin
+      copy:
+        src: vaulty-mail/target/release/vaulty_filter
+        dest: /usr/bin
+        mode: u=rwx,g=rwx,o=rwx
+    # - name: Copy Postfix configs
+    # - name: Reload Postfix
+    # - name: Update MX servers
