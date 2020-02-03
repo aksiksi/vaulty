@@ -36,7 +36,8 @@ default_transport = error
 relay_transport = error
 
 # Virtual mailbox config
-virtual_mailbox_domains = $mydomain
+virtual_transport = vaulty_filter:
+virtual_mailbox_domains = $mydomain, mail.$mydomain
 virtual_mailbox_base = /var/vmail
 virtual_mailbox_maps = hash:/etc/postfix/vmail
 virtual_alias_maps = hash:/etc/postfix/virtual
