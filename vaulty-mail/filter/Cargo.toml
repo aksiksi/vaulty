@@ -9,6 +9,7 @@ vaulty = { path = "../lib" }
 env_logger = "0.7.1"
 log = "0.4.8"
 structopt = "0.3.9"
-mailparse = "0.10.1"
-tokio = { version = "0.2.6", features = ["full"] }
-reqwest = "0.10.0"
+mailparse = "0.10.2"
+reqwest = { version = "0.10.1", features = ["blocking"] }
+serde = { version = "1.0.104", features = ["derive"] }
+serde_json = "1.0.44"
