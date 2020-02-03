@@ -18,7 +18,6 @@ smtpd_use_tls=yes
 smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
 smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
 
-smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated defer_unauth_destination
 mydomain = vaulty.net
 alias_maps = hash:/etc/aliases
 alias_database = hash:/etc/aliases
@@ -43,3 +42,35 @@ virtual_mailbox_maps = hash:/etc/postfix/vmail
 virtual_alias_maps = hash:/etc/postfix/virtual
 virtual_uid_maps = static:5000
 virtual_gid_maps = static:5000
+
+# Security and throttling
+smtpd_relay_restrictions =
+    permit_mynetworks,
+    permit_sasl_authenticated,
+    defer_unauth_destination
+smtpd_recipient_restrictions =
+    permit_sasl_authenticated,
+    reject_invalid_hostname,
+    reject_non_fqdn_hostname,
+    reject_non_fqdn_sender,
+    reject_non_fqdn_recipient,
+    reject_unknown_sender_domain,
+    reject_unknown_recipient_domain,
+    permit_mynetworks,
+    reject_rbl_client list.dsbl.org,
+    reject_rbl_client sbl.spamhaus.org,
+    reject_rbl_client cbl.abuseat.org,
+    reject_rbl_client dul.dnsbl.sorbs.net,
+    permit
+disable_vrfy_command = yes
+smtpd_delay_reject = yes
+smtpd_helo_required = yes
+smtpd_helo_restrictions =
+    permit_mynetworks,
+    reject_non_fqdn_hostname,
+    reject_invalid_hostname,
+    permit
+
+smtpd_error_sleep_time = 1s
+smtpd_soft_error_limit = 10
+smtpd_hard_error_limit = 20
