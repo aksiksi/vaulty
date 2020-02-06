@@ -27,7 +27,6 @@ struct Opt {
 
 /// Transmit this email to the Vaulty processing server
 fn process(mail: email::Email, raw_mail: &[u8],
-           sender: String, recipients: Vec<String>,
            original_recipients: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     // Any mail destined for "postmaster" (or equivalent) must be injected
     // back into Postfix. The recipient would have already been remapped using
@@ -36,7 +35,7 @@ fn process(mail: email::Email, raw_mail: &[u8],
         if VALID_RECIPIENTS.iter().any(|e| e == r) {
             let mut child =
                 Command::new("/usr/sbin/sendmail")
-                        .args(&["-G", "-i", "-f", &sender, &recipients.join(" ")])
+                        .args(&["-G", "-i", "-f", &mail.sender, &mail.recipients.join(" ")])
                         .stdin(Stdio::piped())
                         .spawn()?;
 
@@ -53,8 +52,8 @@ fn process(mail: email::Email, raw_mail: &[u8],
 
     let req = client
         .post("http://httpbin.org/post")
-        .header("VAULTY_SENDER", sender)
-        .header("VAULTY_RECIPIENTS", recipients.join(","))
+        .header("VAULTY_SENDER", &mail.sender)
+        .header("VAULTY_RECIPIENTS", &mail.recipients.join(","))
         .body(reqwest::blocking::Body::from(mail.body));
 
     let resp = req.send()?;
@@ -82,8 +81,10 @@ fn main() {
                     .expect("Failed to read email body from stdin!");
 
     // Parse and process email
-    let mail = email::Email::from_mime(email_content.as_bytes()).unwrap();
+    let mail = email::Email::from_mime(email_content.as_bytes())
+                            .unwrap()
+                            .with_sender(opt.sender)
+                            .with_recipients(opt.recipients);
 
-    process(mail, email_content.as_bytes(), opt.sender,
-            opt.recipients, opt.original_recipients).unwrap();
+    process(mail, email_content.as_bytes(), opt.original_recipients).unwrap();
 }

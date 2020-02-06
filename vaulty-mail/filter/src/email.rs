@@ -3,6 +3,10 @@ use serde::{Deserialize, Serialize};
 /// Represents a single parsed MIME email.
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Email {
+    pub sender: String,
+    pub recipients: Vec<String>,
+    pub subject: String,
+
     /// Plaintext body
     pub body: String,
 
@@ -93,14 +97,45 @@ impl Email {
         return Ok(());
     }
 
+    /// Extract subject from mail headers
+    fn parse_subject(&mut self, part: &mailparse::ParsedMail) {
+        let subject = part.headers.iter()
+                                  .filter(|h| h.get_key().unwrap() == "Subject")
+                                  .map(|h| h.get_value().unwrap())
+                                  .next();
+
+        if let Some(v) = subject {
+            self.subject = v;
+        }
+    }
+
     /// Convert a raw MIME email into structured format
     pub fn from_mime(mime_content: &[u8]) -> Result<Email, Box<dyn std::error::Error>> {
         let parsed = mailparse::parse_mail(mime_content)?;
 
         let mut email = Email::new();
+
+        // Parse mail subject
+        email.parse_subject(&parsed);
+
+        // Parse body and attachments
         email.parse_recursive(&parsed)?;
 
         Ok(email)
+    }
+
+    pub fn with_sender(self, sender: String) -> Self {
+        Self {
+            sender: sender,
+            ..self
+        }
+    }
+
+    pub fn with_recipients(self, recipients: Vec<String>) -> Self {
+        Self {
+            recipients: recipients,
+            ..self
+        }
     }
 }
 
@@ -265,7 +300,7 @@ mod test {
         let mut mail_content = String::new();
         mail_file.read_to_string(&mut mail_content).unwrap();
 
-        Email::from_mime(mail_content.as_bytes()).unwrap()
+        Email::from(mail_content.as_bytes())
     }
 
     #[test]
@@ -274,6 +309,7 @@ mod test {
         let mail = get_mail(mail_path);
 
         assert_eq!(mail.body, "AAFAFAF\n\n");
+        assert_eq!(mail.subject, "ABC");
     }
 
     #[test]
