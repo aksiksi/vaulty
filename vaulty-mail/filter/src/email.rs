@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// Represents a single parsed MIME email.
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Email {
     /// Plaintext body
@@ -12,24 +13,18 @@ pub struct Email {
     pub attachments: Vec<Attachment>,
 }
 
+/// A single attachment.
+///
+/// An attachment can either be inline or regular.
 #[derive(Debug, Serialize, Deserialize)]
-pub enum AttachmentType {
-    Inline,
-    Regular,
+pub enum Attachment {
+    Inline(AttachmentData),
+    Regular(AttachmentData),
 }
 
-impl Default for AttachmentType {
-    fn default() -> Self {
-        AttachmentType::Regular
-    }
-}
-
+/// Represents the data for an email attachment.
 #[derive(Default, Debug, Serialize, Deserialize)]
-pub struct Attachment {
-    /// Attachment type (regular or inline)
-    #[serde(rename = "type")]
-    pub type_: AttachmentType,
-
+pub struct AttachmentData {
     /// MIME type of attachment (e.g., text/plain)
     pub mime: String,
 
@@ -37,8 +32,8 @@ pub struct Attachment {
     /// This may be required at the decode side.
     pub charset: String,
 
-    /// Content-ID is set for *inline* attachments.
-    /// This ID is used to map the attachment to the image in HTML.
+    /// Content-ID is used to map the attachment to the image in HTML.
+    /// Note that this can be set for regular attachments.
     /// For example: <img src="cid:abcd">
     pub content_id: Option<String>,
 
@@ -62,10 +57,9 @@ impl Email {
     /// 1. Body (text and/or html)
     /// 2. Inline attachments
     /// 3. Regular attachments
-    ///
     fn parse_recursive(&mut self, part: &mailparse::ParsedMail) -> Result<(), Box<dyn std::error::Error>> {
         let content_type = &part.ctype;
-        let mimetype = &content_type.mimetype;
+        let mimetype = &content_type.mimetype.to_lowercase();
 
         // If this is an attachment, append to Vec and return
         if let Some(attachment) = Attachment::from_mime(part) {
@@ -110,16 +104,22 @@ impl Email {
     }
 }
 
-impl Attachment {
-    pub fn new() -> Attachment {
-        Default::default()
+impl From<&[u8]> for Email {
+    fn from(val: &[u8]) -> Self {
+        if let Ok(e) = Email::from_mime(val) {
+            e
+        } else {
+            Default::default()
+        }
     }
+}
 
+impl Attachment {
     /// Inspect part headers to determine if this is an attachment.
     /// If it is, build the Attachment and returns it.
     fn from_mime(part: &mailparse::ParsedMail) -> Option<Attachment> {
         let content_type = &part.ctype;
-        let mimetype = &content_type.mimetype;
+        let mimetype = &content_type.mimetype.to_lowercase();
         let charset = &content_type.charset.to_lowercase();
 
         let mut content_disposition = None;
@@ -150,13 +150,13 @@ impl Attachment {
             return None;
         }
 
-        let mut attachment = Attachment::new();
+        let mut d = AttachmentData::new();
 
         // Build attachment struct
-        attachment.mime = mimetype.to_string();
-        attachment.charset = charset.to_string();
-        attachment.name = content_type.params["name"].clone();
-        attachment.data = match part.get_body_raw() {
+        d.mime = mimetype.to_string();
+        d.charset = charset.to_string();
+        d.name = content_type.params["name"].clone();
+        d.data = match part.get_body_raw() {
             Ok(body) => body,
             Err(_) => {
                 log::error!("Attachment body not found");
@@ -164,19 +164,85 @@ impl Attachment {
             },
         };
 
-        attachment.size = attachment.data.len();
-        attachment.content_id = content_id;
+        d.size = d.data.len();
+        d.content_id = content_id;
+
+        let attachment;
 
         if kind == "attachment" {
-            attachment.type_ = AttachmentType::Regular;
+            attachment = Attachment::Regular(d);
         } else if kind == "inline" {
-            attachment.type_ = AttachmentType::Inline;
+            attachment = Attachment::Inline(d);
         } else {
             log::error!("Invalid Content-Disposition type: {}", kind);
             return None;
         }
 
         Some(attachment)
+    }
+
+    pub fn get_name(&self) -> &str {
+        match self {
+            Attachment::Inline(d) => &d.name,
+            Attachment::Regular(d) => &d.name,
+        }
+    }
+
+    pub fn get_size(&self) -> usize {
+        match self {
+            Attachment::Inline(d) => d.size,
+            Attachment::Regular(d) => d.size,
+        }
+    }
+
+    pub fn get_mime(&self) -> &str {
+        match self {
+            Attachment::Inline(d) => &d.mime,
+            Attachment::Regular(d) => &d.mime,
+        }
+    }
+
+    pub fn get_data(&self) -> &Vec<u8> {
+        match self {
+            Attachment::Inline(d) => &d.data,
+            Attachment::Regular(d) => &d.data,
+        }
+    }
+
+    pub fn is_regular(&self) -> bool {
+        match self {
+            Attachment::Inline(_) => false,
+            Attachment::Regular(_) => true,
+        }
+    }
+
+    pub fn is_inline(&self) -> bool {
+        match self {
+            Attachment::Inline(_) => true,
+            Attachment::Regular(_) => false,
+        }
+    }
+}
+
+impl From<&mailparse::ParsedMail<'_>> for Attachment {
+    fn from(val: &mailparse::ParsedMail<'_>) -> Self {
+        if let Some(a) = Attachment::from_mime(val) {
+            a
+        } else {
+            Default::default()
+        }
+    }
+}
+
+impl Default for Attachment {
+    fn default() -> Self {
+        Attachment::Regular(AttachmentData::new())
+    }
+}
+
+impl AttachmentData {
+    fn new() -> AttachmentData {
+        Default::default()
     }
 }
 
@@ -216,13 +282,10 @@ mod test {
         let mail = get_mail(mail_path);
 
         assert_eq!(mail.attachments.len(), 2);
-        assert_eq!(mail.attachments[0].name, "hello.cpp");
-        assert_eq!(mail.attachments[1].size, 7946);
+        assert_eq!(mail.attachments[0].get_name(), "hello.cpp");
+        assert_eq!(mail.attachments[1].get_size(), 7946);
 
-        assert!(match mail.attachments[1].type_ {
-            AttachmentType::Regular => true,
-            AttachmentType::Inline => false,
-        });
+        assert!(mail.attachments[1].is_regular());
     }
 
     #[test]
@@ -231,12 +294,9 @@ mod test {
         let mail = get_mail(mail_path);
 
         assert_eq!(mail.attachments.len(), 3);
-        assert_eq!(mail.attachments[0].name, "logo.gif");
-        assert_eq!(mail.attachments[1].size, 3265);
+        assert_eq!(mail.attachments[0].get_name(), "logo.gif");
+        assert_eq!(mail.attachments[1].get_size(), 3265);
 
-        assert!(match mail.attachments[1].type_ {
-            AttachmentType::Regular => false,
-            AttachmentType::Inline => true,
-        });
+        assert!(mail.attachments[1].is_inline());
     }
 }
