@@ -33,6 +33,7 @@ recipient_delimiter = +
 inet_interfaces = all
 default_transport = error
 relay_transport = error
+export_environment = TZ RUST_LOG=1
 
 # Virtual mailbox config
 virtual_transport = vaulty_filter:

@@ -71,7 +71,6 @@
       shell: RUST_LOG=1 nohup /usr/bin/vaulty_server > vaulty.log &
       args:
         chdir: /tmp
-        creates: vaulty.log
         executable: /bin/bash
     - name: Install Postfix
       apt:
