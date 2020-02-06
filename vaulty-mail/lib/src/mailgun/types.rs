@@ -68,11 +68,17 @@ impl Email {
 
 impl From<Email> for crate::email::Email {
     fn from(email: Email) -> crate::email::Email {
+        let mut recipients = Vec::new();
+        recipients.push(email.recipient);
+
         crate::email::Email {
             sender: email.sender,
-            recipient: email.recipient,
+            recipients: recipients,
             subject: email.subject,
             body: email.body,
+            body_html: Some(email.body_html),
+            attachments: None,
+            ..Default::default()
         }
     }
 }
@@ -120,11 +126,14 @@ impl Attachment {
 
 impl From<Attachment> for crate::email::Attachment {
     fn from(attachment: Attachment) -> crate::email::Attachment {
-        crate::email::Attachment {
-            data: attachment.content.unwrap(),
-            content_type: attachment.content_type,
-            name: attachment.name,
-            size: attachment.size,
-        }
+        crate::email::Attachment::Regular(
+            crate::email::AttachmentData {
+                data: attachment.content.unwrap(),
+                mime: attachment.content_type,
+                name: attachment.name,
+                size: attachment.size,
+                ..Default::default()
+            }
+        )
     }
 }

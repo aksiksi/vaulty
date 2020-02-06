@@ -4,8 +4,6 @@ use std::process::{Command, Stdio};
 
 use structopt::StructOpt;
 
-mod email;
-
 static VALID_RECIPIENTS: &[&str] = &[
     "postmaster@vaulty.net",
     "admin@vaulty.net",
@@ -26,7 +24,7 @@ struct Opt {
 }
 
 /// Transmit this email to the Vaulty processing server
-fn process(mail: email::Email, raw_mail: &[u8],
+fn process(mail: vaulty::email::Email, raw_mail: &[u8],
            original_recipients: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     // Any mail destined for "postmaster" (or equivalent) must be injected
     // back into Postfix. The recipient would have already been remapped using
@@ -81,7 +79,7 @@ fn main() {
                     .expect("Failed to read email body from stdin!");
 
     // Parse and process email
-    let mail = email::Email::from_mime(email_content.as_bytes())
+    let mail = vaulty::email::Email::from_mime(email_content.as_bytes())
                             .unwrap()
                             .with_sender(opt.sender)
                             .with_recipients(opt.recipients);
