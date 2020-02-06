@@ -64,6 +64,15 @@
         src: vaulty-mail/target/release/vaulty_filter
         dest: /usr/bin
         mode: u=rwx,g=rwx,o=rwx
+    - name: Kill "vaulty_server"
+      shell: pkill vaulty_server
+      ignore_errors: yes
+    - name: Start "vaulty_server" on port 7777
+      shell: RUST_LOG=1 nohup /usr/bin/vaulty_server > vaulty.log &
+      args:
+        chdir: /tmp
+        creates: vaulty.log
+        executable: /bin/bash
     - name: Install Postfix
       apt:
         name: postfix

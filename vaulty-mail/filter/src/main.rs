@@ -47,12 +47,13 @@ fn process(mail: vaulty::email::Email, raw_mail: &[u8],
     }
 
     let client = reqwest::blocking::Client::new();
+    let json = serde_json::to_string(&mail)?;
 
     let req = client
-        .post("http://httpbin.org/post")
+        .post("127.0.0.1:7777/filter")
         .header("VAULTY_SENDER", &mail.sender)
         .header("VAULTY_RECIPIENTS", &mail.recipients.join(","))
-        .body(reqwest::blocking::Body::from(mail.body));
+        .body(reqwest::blocking::Body::from(json));
 
     let resp = req.send()?;
 
@@ -61,6 +62,7 @@ fn process(mail: vaulty::email::Email, raw_mail: &[u8],
     let body = resp.text()?;
 
     println!("{}", body);
+    log::info!("{}", body);
 
     Ok(())
 }
@@ -70,8 +72,6 @@ fn main() {
     env_logger::builder().format_timestamp_micros().init();
 
     let opt = Opt::from_args();
-
-    println!("{:?}", opt);
 
     // Get message body from stdin
     let mut email_content = String::new();

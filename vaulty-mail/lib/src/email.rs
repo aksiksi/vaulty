@@ -15,6 +15,11 @@ pub struct Email {
 
     /// List of attachments, if any
     pub attachments: Option<Vec<Attachment>>,
+
+    /// UUID for this email
+    ///
+    /// This ties an email to its attachments.
+    pub uuid: uuid::Uuid,
 }
 
 /// A single attachment.
@@ -49,6 +54,9 @@ pub struct AttachmentData {
 
     /// Attachment data, encoded using charset
     pub data: Vec<u8>,
+
+    /// Associated email's UUID
+    pub email_id: uuid::Uuid,
 }
 
 impl Email {
@@ -66,7 +74,10 @@ impl Email {
         let mimetype = &content_type.mimetype.to_lowercase();
 
         // If this is an attachment, append to Vec and return
-        if let Some(attachment) = Attachment::from_mime(part) {
+        if let Some(mut attachment) = Attachment::from_mime(part) {
+            // Assign email's UUID to this attachment
+            attachment.data_mut().email_id = self.uuid;
+
             // TODO(aksiksi): Evaluate if Option makes sense here
             match &mut self.attachments {
                 Some(v) => v.push(attachment),
@@ -124,6 +135,9 @@ impl Email {
 
         let mut email = Email::new();
 
+        // Assign a UUID to this email
+        email.uuid = uuid::Uuid::new_v4();
+
         // Parse mail subject
         email.parse_subject(&parsed);
 
@@ -160,7 +174,7 @@ impl From<&[u8]> for Email {
 
 impl Attachment {
     /// Inspect part headers to determine if this is an attachment.
-    /// If it is, build the Attachment and returns it.
+    /// If it is, build the Attachment and return it.
     fn from_mime(part: &mailparse::ParsedMail) -> Option<Attachment> {
         let content_type = &part.ctype;
         let mimetype = &content_type.mimetype.to_lowercase();
@@ -267,6 +281,13 @@ impl Attachment {
     pub fn data(self) -> AttachmentData {
         match self {
             Attachment::Inline(d) | Attachment::Regular(d) => d,
+        }
+    }
+
+    /// Get mutable ref to `AttachmentData` struct
+    pub fn data_mut(&mut self) -> &mut AttachmentData {
+        match self {
+            Attachment::Inline(ref mut d) | Attachment::Regular(ref mut d) => d,
         }
     }
 }
