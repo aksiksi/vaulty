@@ -301,10 +301,10 @@ mod test {
 
     static SAMPLE_EMAIL_PATHS: &[&str] = &[
         // Content (multipart/alternative), Attachment, Attachment
-        concat!(env!("CARGO_MANIFEST_DIR"), "/resources", "/sample_email_1.txt"),
+        concat!(env!("CARGO_MANIFEST_DIR"), "/test", "/sample_email_1.txt"),
 
         // Content + Inline Attachment, Attachment, Attachment
-        concat!(env!("CARGO_MANIFEST_DIR"), "/resources", "/sample_email_2.txt"),
+        concat!(env!("CARGO_MANIFEST_DIR"), "/test", "/sample_email_2.txt"),
     ];
 
     fn get_mail(path: &str) -> Email {
