@@ -15,6 +15,7 @@ pub struct Email {
 
     /// List of attachments, if any
     pub attachments: Option<Vec<Attachment>>,
+    pub num_attachments: Option<u32>,
 
     /// UUID for this email
     ///
@@ -77,6 +78,11 @@ impl Email {
         if let Some(mut attachment) = Attachment::from_mime(part) {
             // Assign email's UUID to this attachment
             attachment.data_mut().email_id = self.uuid;
+
+            match &mut self.num_attachments {
+                None => self.num_attachments = Some(1),
+                Some(v) => *v += 1,
+            };
 
             // TODO(aksiksi): Evaluate if Option makes sense here
             match &mut self.attachments {

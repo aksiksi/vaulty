@@ -50,7 +50,7 @@ fn process(mail: vaulty::email::Email, raw_mail: &[u8],
     let json = serde_json::to_string(&mail)?;
 
     let req = client
-        .post("http://127.0.0.1:7777/filter")
+        .post("http://127.0.0.1:7777/postfix/email")
         .header("VAULTY_SENDER", &mail.sender)
         .header("VAULTY_RECIPIENTS", &mail.recipients.join(","))
         .body(reqwest::blocking::Body::from(json));
