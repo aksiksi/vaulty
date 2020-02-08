@@ -2,21 +2,20 @@ use std::sync::atomic;
 
 use chashmap::CHashMap;
 use lazy_static::lazy_static;
-use warp::{Filter, Rejection, reply::Reply};
+use warp::{Filter, Rejection, http::Response, reply::Reply};
 
 use super::controllers;
 
-pub struct MailSession {
-    pub recipient: String,
-    pub num_attachments: atomic::AtomicU32,
+struct MailSession {
+    recipient: String,
+    num_attachments: atomic::AtomicU32,
 }
 
 const MAX_EMAIL_SIZE: u64 = 5 * 1024 * 1024;
 const MAX_ATTACHMENT_SIZE: u64 = 20 * 1024 * 1024;
 
 lazy_static! {
-    pub static ref MAIL_CACHE: CHashMap<String, MailSession> =
-        CHashMap::new();
+    static ref MAIL_CACHE: CHashMap<String, MailSession> = CHashMap::new();
 }
 
 pub fn index() -> impl Filter<Extract = (&'static str, ), Error = Rejection> + Clone {
@@ -25,20 +24,18 @@ pub fn index() -> impl Filter<Extract = (&'static str, ), Error = Rejection> + C
 }
 
 /// Route for Postfix email
-pub fn email() -> impl Filter<Extract = (String, ), Error = Rejection> + Clone {
+pub fn email() -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + Clone {
     warp::path!("postfix" / "email")
          .and(warp::path::end())
+         .and(warp::header::<String>("Authorization"))
          .and(warp::body::content_length_limit(MAX_EMAIL_SIZE))
-         .and(warp::body::bytes().and_then(|body: bytes::Bytes| {
-             async move {
-                 std::str::from_utf8(&body)
-                     .map(String::from)
-                     .map_err(|_e| warp::reject::not_found())
+         .and(warp::body::json())
+         .map(|auth: String, mail: vaulty::email::Email| {
+             let resp = Response::builder();
+
+             if !auth.contains("TEST123") {
+                 return resp.status(403).body("".to_string());
              }
-         }))
-         .map(|body: String| {
-             let mail: vaulty::email::Email
-                 = serde_json::from_str(&body).unwrap();
 
              let uuid = mail.uuid.to_string();
 
@@ -51,17 +48,26 @@ pub fn email() -> impl Filter<Extract = (String, ), Error = Rejection> + Clone {
                  MAIL_CACHE.insert(uuid.clone(), session);
              }
 
-             format!("{}, {}, {}\n", mail.subject, mail.sender, uuid)
+             log::info!("{}, {}, {}", mail.subject, mail.sender, uuid);
+
+             resp.body(format!("{}, {}, {}", mail.subject, mail.sender, uuid))
          })
 }
 
 /// Route for Postfix attachment
-pub fn attachment() -> impl Filter<Extract = (String, ), Error = Rejection> + Clone {
+pub fn attachment() -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + Clone {
     warp::path!("postfix" / "attachment")
          .and(warp::path::end())
          .and(warp::body::content_length_limit(MAX_ATTACHMENT_SIZE))
          .and(warp::body::bytes())
-         .map(|body: bytes::Bytes| {
+         .and(warp::header::<String>("Authorization"))
+         .map(|body: bytes::Bytes, auth: String| {
+             let resp = Response::builder();
+
+             if !auth.contains("TEST123") {
+                 return resp.status(403).body("".to_string());
+             }
+
              let attachment: vaulty::email::Attachment
                  = rmp_serde::decode::from_read(body.as_ref()).unwrap();
              let attachment = attachment.data();
@@ -79,8 +85,13 @@ pub fn attachment() -> impl Filter<Extract = (String, ), Error = Rejection> + Cl
                  MAIL_CACHE.remove(uuid);
              }
 
-             format!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}\n",
-                     attachment.name, recipient, attachment.size, uuid)
+             log::info!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
+                        attachment.name, recipient, attachment.size, uuid);
+
+             resp.body(
+                 format!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
+                        attachment.name, recipient, attachment.size, uuid)
+             )
          })
 }
 

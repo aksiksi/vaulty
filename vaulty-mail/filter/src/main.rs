@@ -51,6 +51,7 @@ fn process(mail: vaulty::email::Email, raw_mail: &[u8],
 
     let req = client
         .post("http://127.0.0.1:7777/postfix/email")
+        .bearer_auth("TEST123")
         .body(reqwest::blocking::Body::from(email));
 
     let resp = req.send()?;
@@ -68,6 +69,7 @@ fn process(mail: vaulty::email::Email, raw_mail: &[u8],
             let req = client
                 .post("http://127.0.0.1:7777/postfix/attachment")
                 .header("Content-Type", attachment.get_mime())
+                .bearer_auth("TEST123")
                 .body(reqwest::blocking::Body::from(raw));
 
             let resp = req.send()?;

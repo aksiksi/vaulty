@@ -4,7 +4,6 @@ use super::config;
 use super::routes;
 
 pub async fn run(arg: config::HttpArg) {
-    // TODO: Log values from config
     log::info!("Starting HTTP server at 0.0.0.0:{}...", arg.port);
 
     let mailgun = routes::mailgun(arg.mailgun_key);
