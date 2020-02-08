@@ -62,23 +62,18 @@ fn process(mail: vaulty::email::Email, raw_mail: &[u8],
 
     assert!(resp.status().is_success());
 
-    let body = resp.text()?;
-
-    println!("{}", body);
-    log::info!("{}", body);
-
     if let Some(attachments) = &mail.attachments {
         for attachment in attachments {
             let raw = rmp_serde::encode::to_vec_named(&attachment)?;
             let req = client
                 .post("http://127.0.0.1:7777/postfix/attachment")
-                .header("Content-Type", attachment.get_mime())
+                .header(reqwest::header::CONTENT_TYPE, attachment.get_mime())
                 .basic_auth(VAULTY_USER, Some(VAULTY_PASS))
                 .body(reqwest::blocking::Body::from(raw));
 
             let resp = req.send()?;
 
-            assert!(resp.status().is_success());
+            log::info!("{}", resp.text()?);
         }
     }
 

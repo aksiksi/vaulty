@@ -7,7 +7,7 @@ pub async fn run(arg: config::HttpArg) {
     log::info!("Starting HTTP server at 0.0.0.0:{}...", arg.port);
 
     let mailgun = routes::mailgun(arg.mailgun_key);
-    let postfix = routes::email().or(routes::attachment());
+    let postfix = routes::postfix();
     let index = routes::index();
 
     let get = warp::get().and(index);
