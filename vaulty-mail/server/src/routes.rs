@@ -2,17 +2,27 @@ use std::sync::atomic;
 
 use chashmap::CHashMap;
 use lazy_static::lazy_static;
-use warp::{Filter, Rejection, http::Response, reply::Reply};
+
+use warp::{Filter, Rejection, http::Response, http::StatusCode, reply::Reply};
 
 use super::controllers;
+
+const MAX_EMAIL_SIZE: u64 = 5 * 1024 * 1024;
+const MAX_ATTACHMENT_SIZE: u64 = 20 * 1024 * 1024;
+
+// TODO: Migrate to file or DB lookup in `basic_auth`
+const VAULTY_USER: &str = "admin";
+const VAULTY_PASS: &str = "test123";
 
 struct MailSession {
     recipient: String,
     num_attachments: atomic::AtomicU32,
 }
 
-const MAX_EMAIL_SIZE: u64 = 5 * 1024 * 1024;
-const MAX_ATTACHMENT_SIZE: u64 = 20 * 1024 * 1024;
+#[derive(Debug)]
+struct Unauthorized;
+
+impl warp::reject::Reject for Unauthorized {}
 
 lazy_static! {
     static ref MAIL_CACHE: CHashMap<String, MailSession> = CHashMap::new();
@@ -23,19 +33,29 @@ pub fn index() -> impl Filter<Extract = (&'static str, ), Error = Rejection> + C
     warp::path::end().map(|| "Welcome to Vaulty!")
 }
 
+fn basic_auth() -> impl Filter<Extract = (), Error = Rejection> + Clone {
+    warp::header::<String>("Authorization")
+         .and_then(|auth: String| async move {
+             let full = format!("{}:{}", VAULTY_USER, VAULTY_PASS);
+
+             if !auth.contains(&base64::encode(&full)) {
+                 Err(warp::reject::custom(Unauthorized))
+             } else {
+                 Ok(())
+             }
+         })
+        .untuple_one()
+}
+
 /// Route for Postfix email
 pub fn email() -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + Clone {
     warp::path!("postfix" / "email")
          .and(warp::path::end())
-         .and(warp::header::<String>("Authorization"))
          .and(warp::body::content_length_limit(MAX_EMAIL_SIZE))
          .and(warp::body::json())
-         .map(|auth: String, mail: vaulty::email::Email| {
+         .and(basic_auth())
+         .map(|mail: vaulty::email::Email| {
              let resp = Response::builder();
-
-             if !auth.contains("TEST123") {
-                 return resp.status(403).body("".to_string());
-             }
 
              let uuid = mail.uuid.to_string();
 
@@ -52,6 +72,15 @@ pub fn email() -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + Clo
 
              resp.body(format!("{}, {}, {}", mail.subject, mail.sender, uuid))
          })
+        .recover(|err: Rejection| async move {
+            if let Some(Unauthorized) = err.find() {
+                Ok(warp::reply::with_status("AUTH REQUIRED",
+                                            StatusCode::UNAUTHORIZED))
+            } else {
+                Ok(warp::reply::with_status("INTERNAL SERVER ERROR",
+                                            StatusCode::INTERNAL_SERVER_ERROR))
+            }
+        })
 }
 
 /// Route for Postfix attachment
@@ -60,13 +89,9 @@ pub fn attachment() -> impl Filter<Extract = (impl Reply, ), Error = Rejection> 
          .and(warp::path::end())
          .and(warp::body::content_length_limit(MAX_ATTACHMENT_SIZE))
          .and(warp::body::bytes())
-         .and(warp::header::<String>("Authorization"))
-         .map(|body: bytes::Bytes, auth: String| {
+         .and(basic_auth())
+         .map(|body: bytes::Bytes| {
              let resp = Response::builder();
-
-             if !auth.contains("TEST123") {
-                 return resp.status(403).body("".to_string());
-             }
 
              let attachment: vaulty::email::Attachment
                  = rmp_serde::decode::from_read(body.as_ref()).unwrap();
@@ -93,6 +118,15 @@ pub fn attachment() -> impl Filter<Extract = (impl Reply, ), Error = Rejection> 
                         attachment.name, recipient, attachment.size, uuid)
              )
          })
+        .recover(|err: Rejection| async move {
+            if let Some(Unauthorized) = err.find() {
+                Ok(warp::reply::with_status("AUTH REQUIRED",
+                                            StatusCode::UNAUTHORIZED))
+            } else {
+                Ok(warp::reply::with_status("INTERNAL SERVER ERROR",
+                                            StatusCode::INTERNAL_SERVER_ERROR))
+            }
+        })
 }
 
 /// Handles mail notifications from Mailgun

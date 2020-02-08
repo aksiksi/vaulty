@@ -4,7 +4,11 @@ use std::process::{Command, Stdio};
 
 use structopt::StructOpt;
 
-static VALID_RECIPIENTS: &[&str] = &[
+// TODO: Migrate to file or DB lookup in `basic_auth`
+const VAULTY_USER: &str = "admin";
+const VAULTY_PASS: &str = "test123";
+
+const VALID_RECIPIENTS: &[&str] = &[
     "postmaster@vaulty.net",
     "admin@vaulty.net",
     "support@vaulty.net",
@@ -51,7 +55,7 @@ fn process(mail: vaulty::email::Email, raw_mail: &[u8],
 
     let req = client
         .post("http://127.0.0.1:7777/postfix/email")
-        .bearer_auth("TEST123")
+        .basic_auth(VAULTY_USER, Some(VAULTY_PASS))
         .body(reqwest::blocking::Body::from(email));
 
     let resp = req.send()?;
@@ -69,7 +73,7 @@ fn process(mail: vaulty::email::Email, raw_mail: &[u8],
             let req = client
                 .post("http://127.0.0.1:7777/postfix/attachment")
                 .header("Content-Type", attachment.get_mime())
-                .bearer_auth("TEST123")
+                .basic_auth(VAULTY_USER, Some(VAULTY_PASS))
                 .body(reqwest::blocking::Body::from(raw));
 
             let resp = req.send()?;
