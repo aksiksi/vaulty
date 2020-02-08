@@ -60,17 +60,10 @@ pub fn attachment() -> impl Filter<Extract = (String, ), Error = Rejection> + Cl
     warp::path!("postfix" / "attachment")
          .and(warp::path::end())
          .and(warp::body::content_length_limit(MAX_ATTACHMENT_SIZE))
-         .and(warp::body::bytes().and_then(|body: bytes::Bytes| {
-             async move {
-                 std::str::from_utf8(&body)
-                     .map(String::from)
-                     .map_err(|_e| warp::reject::not_found())
-             }
-         }))
-         .map(|body: String| {
-             // TODO: Error handling
+         .and(warp::body::bytes())
+         .map(|body: bytes::Bytes| {
              let attachment: vaulty::email::Attachment
-                 = serde_json::from_str(&body).unwrap();
+                 = rmp_serde::decode::from_read(body.as_ref()).unwrap();
              let attachment = attachment.data();
 
              let uuid = &attachment.email_id.to_string();

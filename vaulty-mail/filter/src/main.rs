@@ -47,13 +47,11 @@ fn process(mail: vaulty::email::Email, raw_mail: &[u8],
     }
 
     let client = reqwest::blocking::Client::new();
-    let json = serde_json::to_string(&mail)?;
+    let email = serde_json::to_string(&mail)?;
 
     let req = client
         .post("http://127.0.0.1:7777/postfix/email")
-        .header("VAULTY_SENDER", &mail.sender)
-        .header("VAULTY_RECIPIENTS", &mail.recipients.join(","))
-        .body(reqwest::blocking::Body::from(json));
+        .body(reqwest::blocking::Body::from(email));
 
     let resp = req.send()?;
 
@@ -63,6 +61,20 @@ fn process(mail: vaulty::email::Email, raw_mail: &[u8],
 
     println!("{}", body);
     log::info!("{}", body);
+
+    if let Some(attachments) = &mail.attachments {
+        for attachment in attachments {
+            let raw = rmp_serde::encode::to_vec_named(&attachment)?;
+            let req = client
+                .post("http://127.0.0.1:7777/postfix/attachment")
+                .header("Content-Type", attachment.get_mime())
+                .body(reqwest::blocking::Body::from(raw));
+
+            let resp = req.send()?;
+
+            assert!(resp.status().is_success());
+        }
+    }
 
     Ok(())
 }

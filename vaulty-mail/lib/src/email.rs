@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 /// Represents a single parsed MIME email.
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Email {
+    /// Email metadata
     pub sender: String,
     pub recipients: Vec<String>,
     pub subject: String,
@@ -13,9 +14,16 @@ pub struct Email {
     /// HTML body, if any
     pub body_html: Option<String>,
 
-    /// List of attachments, if any
-    pub attachments: Option<Vec<Attachment>>,
+    /// Number of attachments, if any
     pub num_attachments: Option<u32>,
+
+    /// List of attachments, if any
+    ///
+    /// This is used to keep track of attachments, but is *not* serialized.
+    /// Instead, we use the `email_id` field to tie each attachment to an
+    /// email on the server.
+    #[serde(skip)]
+    pub attachments: Option<Vec<Attachment>>,
 
     /// UUID for this email
     ///
@@ -79,20 +87,20 @@ impl Email {
             // Assign email's UUID to this attachment
             attachment.data_mut().email_id = self.uuid;
 
-            match &mut self.num_attachments {
-                None => self.num_attachments = Some(1),
+            // If this is the first attachment, init the count to 1
+            match self.num_attachments.as_mut() {
                 Some(v) => *v += 1,
+                None => self.num_attachments = Some(1),
             };
 
-            // TODO(aksiksi): Evaluate if Option makes sense here
-            match &mut self.attachments {
-                Some(v) => v.push(attachment),
-                None => {
-                    let mut v = Vec::new();
-                    v.push(attachment);
-                    self.attachments = Some(v);
-                }
-            };
+            // Add the attachment to the Vec, or construct a new Vec
+            if let Some(v) = &mut self.attachments {
+                v.push(attachment);
+            } else {
+                let mut v = Vec::new();
+                v.push(attachment);
+                self.attachments = Some(v);
+            }
 
             return Ok(());
         }
@@ -259,7 +267,13 @@ impl Attachment {
 
     pub fn get_mime(&self) -> &String {
         match self {
-            Attachment::Inline(d) | Attachment::Regular(d)  => &d.mime,
+            Attachment::Inline(d) | Attachment::Regular(d) => &d.mime,
+        }
+    }
+
+    pub fn get_email_id(&self) -> &uuid::Uuid {
+        match self {
+            Attachment::Inline(d) | Attachment::Regular(d) => &d.email_id,
         }
     }
 
@@ -287,6 +301,13 @@ impl Attachment {
     pub fn data(self) -> AttachmentData {
         match self {
             Attachment::Inline(d) | Attachment::Regular(d) => d,
+        }
+    }
+
+    /// Get reference to `AttachmentData`
+    pub fn data_ref(&self) -> &AttachmentData {
+        match self {
+            Attachment::Inline(d) | Attachment::Regular(d) => &d,
         }
     }
 
