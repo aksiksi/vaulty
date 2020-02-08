@@ -64,14 +64,6 @@
         src: vaulty-mail/target/release/vaulty_filter
         dest: /usr/bin
         mode: u=rwx,g=rwx,o=rwx
-    - name: Kill "vaulty_server"
-      shell: pkill vaulty_server
-      ignore_errors: yes
-    - name: Start "vaulty_server" on port 7777
-      shell: RUST_LOG=1 nohup /usr/bin/vaulty_server > vaulty.log &
-      args:
-        chdir: /tmp
-        executable: /bin/bash
     - name: Install Postfix
       apt:
         name: postfix
@@ -110,3 +102,16 @@
       shell: /usr/sbin/postmap /etc/postfix/vmail
     - name: Reload Postfix configs
       shell: postfix reload
+    - name: Copy "vaulty_server" systemd unit
+      copy:
+        src: vaulty-mail/server/resources/vaulty.service
+        dest: /etc/systemd/system/
+    - name: Copy "vaulty_server" conf file
+      copy:
+        src: vaulty-mail/server/resources/vaulty.conf
+        dest: /etc/vaulty/
+    - name: Enable and start vaulty service
+      systemd:
+        state: restarted
+        daemon_reload: yes
+        name: vaulty
