@@ -1,6 +1,7 @@
 use warp::{self, Filter};
 
 use super::config;
+use super::errors;
 use super::routes;
 
 pub async fn run(arg: config::HttpArg) {
@@ -13,7 +14,7 @@ pub async fn run(arg: config::HttpArg) {
     let get = warp::get().and(index);
     let post = warp::post().and(mailgun.or(postfix));
 
-    let router = get.or(post);
+    let router = get.or(post).recover(errors::handle_rejection);
 
     warp::serve(router).run(([0, 0, 0, 0], arg.port)).await;
 }

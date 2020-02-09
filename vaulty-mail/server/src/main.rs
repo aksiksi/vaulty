@@ -1,5 +1,7 @@
 mod config;
 mod controllers;
+mod errors;
+mod filters;
 mod http;
 mod routes;
 

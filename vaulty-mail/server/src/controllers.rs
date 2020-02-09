@@ -1,8 +1,83 @@
+use super::errors;
+use super::routes;
+
 use vaulty::{email, mailgun};
 
-use warp::{Rejection, reply::Reply};
+use warp::{Rejection, http::Response, reply::Reply};
 
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+
+pub mod postfix {
+    use super::*;
+
+    pub async fn email(mail: email::Email) -> Result<impl Reply, Rejection> {
+         let resp = Response::builder();
+
+         let uuid = mail.uuid.to_string();
+
+         if let Some(n) = mail.num_attachments {
+             let session = routes::MailSession {
+                num_attachments: n,
+                recipient: mail.recipients[0].clone(),
+             };
+
+             routes::MAIL_CACHE.insert(uuid.clone(), session);
+         }
+
+         log::info!("{}, {}, {}", mail.subject, mail.sender, uuid);
+
+         resp.body(format!("{}, {}, {}", mail.subject, mail.sender, uuid))
+             .map_err(|e| {
+                 let err = errors::VaultyError { msg: e.to_string() };
+                 warp::reject::custom(err)
+             })
+    }
+
+    pub async fn attachment(body: bytes::Bytes) -> Result<impl Reply, Rejection> {
+         let resp = Response::builder();
+
+         // TODO: No unwrap!
+         let attachment: vaulty::email::Attachment
+             = rmp_serde::decode::from_read(body.as_ref()).unwrap();
+
+         let attachment = attachment.data();
+         let uuid = &attachment.email_id.to_string();
+
+         log::debug!("Got attachment for email {}", uuid);
+
+         let recipient;
+
+         let is_last_attachment = {
+             let mut lock = routes::MAIL_CACHE.get_mut(uuid).unwrap();
+
+             let mail_session = &mut *lock;
+             recipient = mail_session.recipient.clone();
+
+             let attachment_count = &mut mail_session.num_attachments;
+             *attachment_count -= 1;
+
+             *attachment_count == 0
+         };
+
+         // If this is the last attachment, remove the cache entry
+         if is_last_attachment {
+             log::info!("Removing email {} from cache", uuid);
+             routes::MAIL_CACHE.remove(uuid);
+         }
+
+         log::info!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
+                    attachment.name, recipient, attachment.size, uuid);
+
+         resp.body(
+             format!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
+                    attachment.name, recipient, attachment.size, uuid)
+         )
+         .map_err(|e| {
+             let err = errors::VaultyError { msg: e.to_string() };
+             warp::reject::custom(err)
+         })
+    }
+}
 
 pub async fn mailgun(content_type: Option<String>, body: String,
                      api_key: Option<String>) -> Result<impl Reply, Rejection> {
