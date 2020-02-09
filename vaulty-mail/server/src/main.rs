@@ -1,5 +1,7 @@
 mod config;
 mod controllers;
+mod errors;
+mod filters;
 mod http;
 mod routes;
 
@@ -26,6 +28,7 @@ async fn main() {
                        .long("mailgun-key")
                        .help("Mailgun API key")
                        .value_name("KEY")
+                       .default_value("NONE")
                        .takes_value(true))
                   .get_matches();
 
@@ -36,6 +39,8 @@ async fn main() {
         port: matches.value_of("port").unwrap().parse::<u16>().unwrap(),
         mailgun_key: matches.value_of("mailgun_key").map(|a| a.to_string()),
     };
+
+    log::info!("Starting vaulty_server...");
 
     http::run(arg).await;
 }

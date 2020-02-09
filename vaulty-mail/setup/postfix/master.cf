@@ -10,7 +10,6 @@
 #               (yes)   (yes)   (yes)   (never) (100)
 # ==========================================================================
 smtp      inet  n       -       -       -       -       smtpd
-    -o content_filter=filter:dummy
 #smtp      inet  n       -       -       -       1       postscreen
 #smtpd     pass  -       -       -       -       -       smtpd
 #dnsblog   unix  -       -       -       -       0       dnsblog
@@ -123,7 +122,14 @@ mailman   unix  -       n       n       -       -       pipe
   flags=FR user=list argv=/usr/lib/mailman/bin/postfix-to-mailman.py
   ${nexthop} ${user}
 
-# Custom mail filter
-filter    unix  -       n       n       -       10      pipe
-    flags=Rq user=vmail null_sender=
-    argv=/etc/postfix/filters/vaulty_filter -r ${recipient} -s ${sender}
+# Vaulty mail filter
+#
+# Flags:
+# X -> Mark mail as delivered after handoff to filter agent
+# R -> Prepend return path address
+# q -> quote whitespace in CLI args
+#
+# Details here: http://www.postfix.org/pipe.8.html
+vaulty_filter    unix  -       n       n       -       30      pipe
+    flags=XRq user=vmail null_sender=
+    argv=/usr/bin/vaulty_filter -r ${recipient} -s ${sender} -o ${original_recipient}

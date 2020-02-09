@@ -1,0 +1,12 @@
+[Unit]
+Description=Vaulty Server
+After=postfix.target network.target
+
+[Service]
+EnvironmentFile=/etc/vaulty/vaulty.conf
+ExecStart=/usr/bin/vaulty_server
+ExecStop=pkill vaulty_server
+User=vmail
+
+[Install]
+WantedBy=multi-user.target

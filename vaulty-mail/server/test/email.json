@@ -1,0 +1,8 @@
+{
+    "subject": "ABC",
+    "sender": "abc",
+    "recipients": ["a", "b"],
+    "body": "HELLO",
+    "uuid": "00000000-0000-0000-0000-000000000000",
+    "num_attachments": 1
+}

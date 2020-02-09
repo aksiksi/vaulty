@@ -20,7 +20,7 @@ impl EmailHandler {
 
     pub async fn handle(&self, email: &email::Email, attachment: Option<email::Attachment>)
         -> Result<(), Box<dyn std::error::Error>> {
-        log::info!("Handling mail for {}", email.recipient);
+        log::info!("Handling mail for {}", email.recipients[0]);
         log::info!("Date in UTC: {}", self.date);
 
         // 1. Figure out if user is valid and active
@@ -39,6 +39,8 @@ impl EmailHandler {
 
         // 4. Write all attachments to folder via Dropbox API
         if let Some(attachment) = attachment {
+            let attachment = attachment.data();
+
             let file_path = format!("{}/{}", storage_path, attachment.name);
             let result = dropbox_client.upload(&file_path, attachment.data, true).await;
 
