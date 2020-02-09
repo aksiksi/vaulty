@@ -15,22 +15,21 @@ pub mod postfix {
 
          let uuid = mail.uuid.to_string();
 
-         if let Some(n) = mail.num_attachments {
-             let session = routes::MailSession {
-                num_attachments: n,
-                recipient: mail.recipients[0].clone(),
-             };
-
-             routes::MAIL_CACHE.insert(uuid.clone(), session);
-         }
-
          log::info!("{}, {}, {}", mail.subject, mail.sender, uuid);
 
-         resp.body(format!("{}, {}, {}", mail.subject, mail.sender, uuid))
-             .map_err(|e| {
-                 let err = errors::VaultyError { msg: e.to_string() };
-                 warp::reject::custom(err)
-             })
+         let resp =
+             resp.body(format!("{}, {}, {}", mail.subject, mail.sender, uuid))
+                 .map_err(|e| {
+                     let err = errors::VaultyError { msg: e.to_string() };
+                     warp::reject::custom(err)
+                 });
+
+         // Create a cache entry if this email has attachments
+         if let Some(_) = mail.num_attachments {
+             routes::MAIL_CACHE.insert(uuid.clone(), mail);
+         }
+
+         resp
     }
 
     pub async fn attachment(body: bytes::Bytes) -> Result<impl Reply, Rejection> {
@@ -40,42 +39,46 @@ pub mod postfix {
          let attachment: vaulty::email::Attachment
              = rmp_serde::decode::from_read(body.as_ref()).unwrap();
 
-         let attachment = attachment.data();
-         let uuid = &attachment.email_id.to_string();
+         let uuid = attachment.get_email_id().to_string();
 
          log::debug!("Got attachment for email {}", uuid);
 
-         let recipient;
-
          let is_last_attachment = {
-             let mut lock = routes::MAIL_CACHE.get_mut(uuid).unwrap();
+             let mut lock = routes::MAIL_CACHE.get_mut(&uuid).unwrap();
+             let mail = &mut *lock;
+             let attachment_count = &mut mail.num_attachments.unwrap();
 
-             let mail_session = &mut *lock;
-             recipient = mail_session.recipient.clone();
-
-             let attachment_count = &mut mail_session.num_attachments;
              *attachment_count -= 1;
-
              *attachment_count == 0
          };
 
          // If this is the last attachment, remove the cache entry
          if is_last_attachment {
              log::info!("Removing email {} from cache", uuid);
-             routes::MAIL_CACHE.remove(uuid);
+             routes::MAIL_CACHE.remove(&uuid);
          }
 
-         log::info!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
-                    attachment.name, recipient, attachment.size, uuid);
+         let handler = vaulty::EmailHandler::new();
+         let lock = routes::MAIL_CACHE.get(&uuid).unwrap();
+         let email = &*lock;
+         let recipient = &email.recipients[0];
 
-         resp.body(
-             format!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
-                    attachment.name, recipient, attachment.size, uuid)
-         )
-         .map_err(|e| {
-             let err = errors::VaultyError { msg: e.to_string() };
-             warp::reject::custom(err)
-         })
+         log::info!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
+                    attachment.get_name(), recipient, attachment.get_size(), uuid);
+
+         let resp = resp.body(
+            format!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
+                    attachment.get_name(), recipient, attachment.get_size(), uuid)
+         ).unwrap();
+
+         let result = handler.handle(email, Some(attachment)).await
+               .map(|_| resp)
+               .map_err(|e| {
+                   let err = errors::VaultyError { msg: e.to_string() };
+                   warp::reject::custom(err)
+               });
+
+         result
     }
 }
 

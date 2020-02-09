@@ -7,13 +7,9 @@ use super::config;
 use super::controllers;
 use super::filters;
 
-pub struct MailSession {
-    pub recipient: String,
-    pub num_attachments: u32,
-}
-
 lazy_static! {
-    pub static ref MAIL_CACHE: CHashMap<String, MailSession> = CHashMap::new();
+    pub static ref MAIL_CACHE: CHashMap<String, vaulty::email::Email> =
+        CHashMap::new();
 }
 
 pub fn index() -> impl Filter<Extract = (&'static str, ), Error = Rejection> + Clone {
