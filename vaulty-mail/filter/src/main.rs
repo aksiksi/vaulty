@@ -1,8 +1,12 @@
 use std::io::Read;
-use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
-use futures::stream::{self, TryStreamExt};
+// AsyncRead trait for tokio::io::stdin
+use tokio::prelude::*;
+use tokio::process::Command;
+
+use futures::stream::{FuturesUnordered, StreamExt};
+
 use structopt::StructOpt;
 
 // TODO: Migrate to file or DB lookup in `basic_auth`
@@ -68,7 +72,7 @@ async fn process(mail: vaulty::email::Email, raw_mail: &[u8],
 
             {
                 let stdin = child.stdin.as_mut().expect("Failed to open stdin");
-                stdin.write_all(raw_mail).expect("Failed to write to stdin");
+                stdin.write_all(raw_mail).await.expect("Failed to write to stdin");
             }
 
             return Ok(());
@@ -88,11 +92,14 @@ async fn process(mail: vaulty::email::Email, raw_mail: &[u8],
     assert!(resp.status().is_success());
 
     if let Some(attachments) = &mail.attachments {
-        // 1. Create a TryStream from an iterator
-        // 2. Iterator must be of type `Result`
-        // 3. Run a function for each element in the stream, concurrently
-        stream::iter(attachments.iter().map(Ok))
-               .try_for_each_concurrent(None, send_attachment).await?;
+        // 1. Create an iterator of `Future<Result<_, _>>`
+        // 2. Collect the futures in a `FuturesUnordered`
+        // 3. Collect the results into a `Vec`
+        attachments.iter()
+                   .map(send_attachment)
+                   .collect::<FuturesUnordered<_>>()
+                   .collect::<Vec<_>>()
+                   .await;
     }
 
     Ok(())
@@ -112,9 +119,9 @@ async fn main() {
 
     // Parse and process email
     let mail = vaulty::email::Email::from_mime(email_content.as_bytes())
-                            .unwrap()
-                            .with_sender(opt.sender)
-                            .with_recipients(opt.recipients);
+                                    .unwrap()
+                                    .with_sender(opt.sender)
+                                    .with_recipients(opt.recipients);
 
     process(mail, email_content.as_bytes(), opt.original_recipients)
         .await

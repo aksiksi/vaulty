@@ -1,16 +1,9 @@
-use chashmap::CHashMap;
-use lazy_static::lazy_static;
 
 use warp::{Filter, Rejection, reply::Reply};
 
 use super::config;
 use super::controllers;
 use super::filters;
-
-lazy_static! {
-    pub static ref MAIL_CACHE: CHashMap<String, vaulty::email::Email> =
-        CHashMap::new();
-}
 
 pub fn index() -> impl Filter<Extract = (&'static str, ), Error = Rejection> + Clone {
     // GET /hello/warp => 200 OK with body "Hello, warp!"
