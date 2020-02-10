@@ -7,8 +7,10 @@ use super::routes;
 pub async fn run(arg: config::HttpArg) {
     log::info!("Starting HTTP server at 0.0.0.0:{}...", arg.port);
 
+    let pool = sqlx::PgPool::new("postgres://vaulty:test123@localhost/vaulty").await.unwrap();
+
     let mailgun = routes::mailgun(arg.mailgun_key);
-    let postfix = routes::postfix();
+    let postfix = routes::postfix(pool.clone());
     let index = routes::index();
 
     let get = warp::get().and(index);

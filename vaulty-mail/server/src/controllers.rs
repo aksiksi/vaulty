@@ -4,7 +4,8 @@ use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
 use lazy_static::lazy_static;
 use tokio::sync::RwLock;
 use warp::{Rejection, http::Response, reply::Reply};
-use vaulty::{email, mailgun};
+
+use vaulty::{email, mailgun, db::{LogLevel}};
 
 use super::errors;
 
@@ -16,10 +17,29 @@ lazy_static! {
 pub mod postfix {
     use super::*;
 
-    pub async fn email(mail: email::Email) -> Result<impl Reply, Rejection> {
-         let resp = Response::builder();
+    pub async fn email(mail: email::Email, mut db: sqlx::PgPool)
+        -> Result<impl Reply, Rejection> {
+         let mut db_client = vaulty::db::Client::new(&mut db);
+
+         {
+             let recipient = &mail.recipients[0];
+             let msg = format!("Got email for recipient {}", recipient);
+             let _ = db_client.log(msg, recipient, LogLevel::Info).await;
+         }
+
+         // Get address information for the relevant recipient address
+         // Use this to verify that user still has enough quota remaining
+         let address = match db_client.get_address(&mail.recipients[0]).await {
+             Ok(a) => a,
+             Err(e) => {
+                 let err = errors::VaultyError { msg: e.to_string() };
+                 return Err(warp::reject::custom(err));
+             },
+         };
 
          let uuid = mail.uuid.to_string();
+
+         let resp = Response::builder();
 
          log::info!("{}, {}, {}", mail.subject, mail.sender, uuid);
 
@@ -36,11 +56,15 @@ pub mod postfix {
              cache.insert(uuid.clone(), mail);
          }
 
+         let _ = db_client.update_address(&address).await;
+
          resp
     }
 
-    pub async fn attachment(body: bytes::Bytes) -> Result<impl Reply, Rejection> {
+    pub async fn attachment(body: bytes::Bytes, mut db: sqlx::PgPool)
+        -> Result<impl Reply, Rejection> {
          let resp = Response::builder();
+         let mut db_client = vaulty::db::Client::new(&mut db);
 
          // TODO: No unwrap!
          let attachment: vaulty::email::Attachment
@@ -57,6 +81,9 @@ pub mod postfix {
              let cache = MAIL_CACHE.read().await;
              let email = cache.get(&uuid).unwrap();
              let recipient = &email.recipients[0];
+
+             let msg = format!("Got attachment for recipient {}", recipient);
+             let _ = db_client.log(msg, recipient, LogLevel::Info).await;
 
              log::info!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
                         attachment.get_name(), recipient, attachment.get_size(), uuid);

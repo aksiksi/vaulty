@@ -1,5 +1,6 @@
 use chrono::offset::Utc;
 
+pub mod db;
 pub mod dropbox;
 pub mod email;
 pub mod mailgun;

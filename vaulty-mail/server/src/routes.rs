@@ -11,30 +11,31 @@ pub fn index() -> impl Filter<Extract = (&'static str, ), Error = Rejection> + C
 }
 
 /// Route for /postfix
-pub fn postfix() -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + Clone {
-    email().or(attachment())
+pub fn postfix(db: sqlx::PgPool)
+    -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + Clone {
+    email(db.clone()).or(attachment(db.clone()))
 }
 
 /// Route for /postfix/email
 /// Handles email body and creates a cache entry to track attachments
-pub fn email() -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + Clone {
+pub fn email(db: sqlx::PgPool) -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + Clone {
     warp::path!("postfix" / "email")
          .and(warp::path::end())
          .and(filters::basic_auth())
          .and(warp::body::content_length_limit(config::MAX_EMAIL_SIZE))
          .and(warp::body::json())
-         .and_then(controllers::postfix::email)
+         .and_then(move |email| controllers::postfix::email(email, db.clone()))
 }
 
 /// Route for /postfix/attachment
 /// Handles each email attachment
-pub fn attachment() -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + Clone {
+pub fn attachment(db: sqlx::PgPool) -> impl Filter<Extract = (impl Reply, ), Error = Rejection> + Clone {
     warp::path!("postfix" / "attachment")
          .and(warp::path::end())
          .and(filters::basic_auth())
          .and(warp::body::content_length_limit(config::MAX_ATTACHMENT_SIZE))
          .and(warp::body::bytes())
-         .and_then(controllers::postfix::attachment)
+         .and_then(move |body| controllers::postfix::attachment(body, db.clone()))
 }
 
 /// Handles mail notifications from Mailgun
