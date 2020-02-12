@@ -10,6 +10,10 @@ use vaulty::{email, mailgun, db::{LogLevel}};
 use super::errors;
 
 lazy_static! {
+    // NOTE: Might make sense to include `Address` with the cache entry.
+    // One advantage is we can find the target recipient address from
+    // the list of recipients once, then use the `Address` info in attachments
+    // processing.
     static ref MAIL_CACHE: RwLock<HashMap<String, vaulty::email::Email>> =
         RwLock::new(HashMap::new());
 }
@@ -17,19 +21,17 @@ lazy_static! {
 pub mod postfix {
     use super::*;
 
-    pub async fn email(mail: email::Email, mut db: sqlx::PgPool)
+    pub async fn email(email: email::Email, mut db: sqlx::PgPool)
         -> Result<impl Reply, Rejection> {
          let mut db_client = vaulty::db::Client::new(&mut db);
 
-         {
-             let recipient = &mail.recipients[0];
-             let msg = format!("Got email for recipient {}", recipient);
-             let _ = db_client.log(msg, recipient, LogLevel::Info).await;
-         }
+         let recipient = &email.recipients[0];
+         let msg = format!("Got email for recipient {}", recipient);
+         let _ = db_client.log(msg, recipient, LogLevel::Info).await;
 
          // Get address information for the relevant recipient address
          // Use this to verify that user still has enough quota remaining
-         let address = match db_client.get_address(&mail.recipients[0]).await {
+         let address = match db_client.get_address(recipient).await {
              Ok(a) => a,
              Err(e) => {
                  let err = errors::VaultyError { msg: e.to_string() };
@@ -37,28 +39,32 @@ pub mod postfix {
              },
          };
 
-         let uuid = mail.uuid.to_string();
+         // Increment received email count at the start
+         let _ = db_client.update_address(&address).await;
 
+         let uuid = email.uuid.to_string();
          let resp = Response::builder();
 
-         log::info!("{}, {}, {}", mail.subject, mail.sender, uuid);
+         log::info!("{}, {}, {}", email.subject, email.sender, uuid);
 
-         let resp =
-             resp.body(format!("{}, {}, {}", mail.subject, mail.sender, uuid))
+         // TODO(aksiksi): Perform checks here and return HTTP error
+         // if any checks failed. This will stop filter from processing
+         // any attachments.
+
+         let result =
+             resp.body(format!("{}, {}, {}", email.subject, email.sender, uuid))
                  .map_err(|e| {
                      let err = errors::VaultyError { msg: e.to_string() };
                      warp::reject::custom(err)
                  });
 
          // Create a cache entry if email has attachments
-         if let Some(_) = mail.num_attachments {
+         if let Some(_) = email.num_attachments {
              let mut cache = MAIL_CACHE.write().await;
-             cache.insert(uuid.clone(), mail);
+             cache.insert(uuid.clone(), email);
          }
 
-         let _ = db_client.update_address(&address).await;
-
-         resp
+         result
     }
 
     pub async fn attachment(body: bytes::Bytes, mut db: sqlx::PgPool)
@@ -72,39 +78,19 @@ pub mod postfix {
 
          let uuid = attachment.get_email_id().to_string();
 
-         log::debug!("Got attachment for email {}", uuid);
-
-         let result;
-
-         // Acquire cache read lock and process this attachment
-         {
+         // Acquire cache read lock and clone email
+         // This minimizes read lock time
+         let email = {
              let cache = MAIL_CACHE.read().await;
-             let email = cache.get(&uuid).unwrap();
-             let recipient = &email.recipients[0];
+             cache.get(&uuid).unwrap().clone()
+         };
 
-             let msg = format!("Got attachment for recipient {}", recipient);
-             let _ = db_client.log(msg, recipient, LogLevel::Info).await;
-
-             log::info!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
-                        attachment.get_name(), recipient, attachment.get_size(), uuid);
-
-             let resp = resp.body(
-                format!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
-                        attachment.get_name(), recipient, attachment.get_size(), uuid)
-             ).unwrap();
-
-             let handler = vaulty::EmailHandler::new();
-
-             result = handler.handle(email, Some(attachment)).await
-                             .map(|_| resp)
-                             .map_err(|e| {
-                                 let err = errors::VaultyError { msg: e.to_string() };
-                                 warp::reject::custom(err)
-                             });
-         }
+         let recipient = &email.recipients[0];
+         let msg = format!("Got attachment for recipient {}", recipient);
+         let _ = db_client.log(msg, recipient, LogLevel::Info).await;
 
          // If this is the last attachment for this email, cleanup the cache
-         // entry
+         // entry. Get this done early to minimize the chance of leaking an entry.
          {
              let mut cache = MAIL_CACHE.write().await;
              let mail = &mut cache.get_mut(&uuid).unwrap();
@@ -118,7 +104,27 @@ pub mod postfix {
              }
          }
 
-         result
+         log::info!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
+                    attachment.get_name(), recipient, attachment.get_size(), uuid);
+
+         let resp = resp.body(
+            format!("Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
+                    attachment.get_name(), recipient, attachment.get_size(), uuid)
+         ).unwrap();
+
+         let handler = vaulty::EmailHandler::new();
+
+         let resp = handler.handle(&email, Some(attachment)).await
+                           .map(|_| resp)
+                           .map_err(|e| {
+                               let err = errors::VaultyError { msg: e.to_string() };
+                               warp::reject::custom(err)
+                           });
+
+
+         // TODO: If result contains an error, log this to DB
+
+         resp
     }
 }
 
