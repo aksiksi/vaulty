@@ -11,16 +11,21 @@
       apt:
         name: rsync
         state: present
+    - name: Install fail2ban
+      apt:
+        name: fail2ban
+        state: present
+    - name: Configure fail2ban (TODO: enable SSH)
+      copy:
+        remote_src: yes
+        src: /etc/fail2ban/jail.conf
+        dest: /etc/fail2ban/jail.local
 
 # We need to provision vaulty-web first to ensure that DB is
 # setup and ready to go for Postfix virtual mailboxes
 - name: Provision DB
   hosts: dbservers
   tasks:
-    - name: Install Nginx
-      apt:
-        name: nginx
-        state: present
     - name: Install Postgres
       apt:
         pkg:
