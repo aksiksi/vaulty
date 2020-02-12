@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Represents a single parsed MIME email.
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Email {
     /// Email metadata
     pub sender: String,
@@ -34,14 +34,14 @@ pub struct Email {
 /// A single attachment.
 ///
 /// An attachment can either be inline or regular.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Attachment {
     Inline(AttachmentData),
     Regular(AttachmentData),
 }
 
 /// Represents the data for an email attachment.
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AttachmentData {
     /// MIME type of attachment (e.g., text/plain)
     pub mime: String,
