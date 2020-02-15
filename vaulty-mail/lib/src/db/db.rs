@@ -146,7 +146,7 @@ impl <'a> Client<'a> {
 
         // TODO
         // let total_size = email.size;
-        let total_size = 10000;
+        let total_size = email.size;
 
         let creation_time: DateTime<Utc> = Utc::now();
 
@@ -161,7 +161,7 @@ impl <'a> Client<'a> {
                              .bind(recipient)
                              .bind(email_id)
                              .bind(num_attachments as i32)
-                             .bind(total_size)
+                             .bind(total_size as i32)
                              .bind(creation_time)
                              .execute(self.db)
                              .await?;

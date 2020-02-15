@@ -14,8 +14,11 @@ pub struct Email {
     /// HTML body, if any
     pub body_html: Option<String>,
 
+    /// Total email size, in bytes
+    pub size: usize,
+
     /// Number of attachments, if any
-    pub num_attachments: Option<u32>,
+    pub num_attachments: Option<usize>,
 
     /// List of attachments, if any
     ///
@@ -148,6 +151,9 @@ impl Email {
         let parsed = mailparse::parse_mail(mime_content)?;
 
         let mut email = Email::new();
+
+        // Size of email, in bytes
+        email.size = mime_content.len();
 
         // Assign a UUID to this email
         email.uuid = uuid::Uuid::new_v4();
