@@ -8,12 +8,13 @@ pub struct Unauthorized;
 impl warp::reject::Reject for Unauthorized {}
 
 #[derive(Debug)]
-pub struct VaultyError {
+pub struct VaultyServerError {
     pub msg: String,
 }
 
-impl warp::reject::Reject for VaultyError {}
+impl warp::reject::Reject for VaultyServerError {}
 
+// TODO: Map to JSON string with more descriptive output
 pub async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     if err.is_not_found() {
         Ok(warp::reply::with_status("NOT FOUND".to_string(),
@@ -21,7 +22,7 @@ pub async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> 
     } else if let Some(Unauthorized) = err.find() {
         Ok(warp::reply::with_status("AUTH REQUIRED".to_string(),
                                     StatusCode::UNAUTHORIZED))
-    } else if let Some(VaultyError { msg: e }) = err.find() {
+    } else if let Some(VaultyServerError { msg: e }) = err.find() {
         Ok(warp::reply::with_status(e.clone(),
                                     StatusCode::UNAUTHORIZED))
     } else {
