@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub const UUID_NAMESPACE: &str = "vaulty.net";
+
 /// Represents a single parsed MIME email.
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Email {
@@ -14,8 +16,11 @@ pub struct Email {
     /// HTML body, if any
     pub body_html: Option<String>,
 
+    /// Total email size, in bytes
+    pub size: usize,
+
     /// Number of attachments, if any
-    pub num_attachments: Option<u32>,
+    pub num_attachments: Option<usize>,
 
     /// List of attachments, if any
     ///
@@ -131,15 +136,34 @@ impl Email {
         return Ok(());
     }
 
-    /// Extract subject from mail headers
-    fn parse_subject(&mut self, part: &mailparse::ParsedMail) {
-        let subject = part.headers.iter()
-                                  .filter(|h| h.get_key().unwrap() == "Subject")
-                                  .map(|h| h.get_value().unwrap())
-                                  .next();
+    /// Extract relevant headers from email
+    /// For now, this is limited to Subject and Message-ID
+    fn parse_headers(&mut self, part: &mailparse::ParsedMail) {
+        // NOTE(aksiksi): Can header names be lowercase?
+        let headers = part.headers.iter()
+                                  .filter(|h| {
+                                      let k = h.get_key().unwrap();
+                                      ["Subject", "Message-ID"].contains(&k.as_str())
+                                  })
+                                  .map(|h| {
+                                      (h.get_key().unwrap(), h.get_value().unwrap())
+                                  });
 
-        if let Some(v) = subject {
-            self.subject = v;
+        for (k, v) in headers {
+            if k == "Subject" {
+                self.subject = v;
+            } else if k == "Message-ID" {
+                // Build UUID based on message ID (type 5)
+                let message_id = v.replace("<", "").replace(">", "");
+
+                // First, we generate a namespace UUID based on the standard
+                // URL namespace
+                let namespace = uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL,
+                                                   UUID_NAMESPACE.as_bytes());
+
+                // Now generate a v5 UUID for this email based on it Message-ID
+                self.uuid = uuid::Uuid::new_v5(&namespace, message_id.as_bytes());
+            }
         }
     }
 
@@ -149,11 +173,15 @@ impl Email {
 
         let mut email = Email::new();
 
+        // Size of email, in bytes
+        email.size = mime_content.len();
+
         // Assign a UUID to this email
         email.uuid = uuid::Uuid::new_v4();
 
-        // Parse mail subject
-        email.parse_subject(&parsed);
+        // Parse mail headers
+        // This will overwrite the UUID above if "Message-ID" is found
+        email.parse_headers(&parsed);
 
         // Parse body and attachments
         email.parse_recursive(&parsed)?;

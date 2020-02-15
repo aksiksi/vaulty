@@ -13,7 +13,7 @@ log = "0.4.8"
 chrono = "0.4.10"
 bytes = "0.5.3"
 mailparse = "0.10.2"
-uuid = { version = "0.8", features = ["serde", "v4"] }
+uuid = { version = "0.8", features = ["serde", "v4", "v5"] }
 sqlx = { version = "0.2", default-features = false, features = [ "runtime-tokio", "macros", "postgres", "chrono", "uuid" ] }
 
 [dev-dependencies]

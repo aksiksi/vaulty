@@ -1,3 +1,6 @@
+use crate::email::Email;
+
+use chrono::{DateTime, Utc};
 use sqlx::Row;
 
 pub enum LogLevel {
@@ -26,7 +29,7 @@ pub struct Address {
     pub max_email_size: i32,
     pub quota: i32,
     pub received: i32,
-    pub last_renewal_time: chrono::DateTime<chrono::Utc>,
+    pub last_renewal_time: DateTime<Utc>,
 }
 
 /// Abstraction over sqlx DB client for Vaulty DB
@@ -34,6 +37,7 @@ pub struct Client<'a> {
     pub db: &'a mut sqlx::PgPool,
     pub user_table: String,
     pub address_table: String,
+    pub email_table: String,
     pub log_table: String,
 }
 
@@ -43,6 +47,7 @@ impl <'a> Client<'a> {
             db: db,
             user_table: "users".to_string(),
             address_table: "addresses".to_string(),
+            email_table: "emails".to_string(),
             log_table: "logs".to_string(),
         }
     }
@@ -70,8 +75,6 @@ impl <'a> Client<'a> {
         let query = format!("
             SELECT * FROM {} WHERE address = $1", &self.address_table
         );
-
-        log::info!("{}", query);
 
         let row = sqlx::query(&query)
                        .bind(recipient)
@@ -111,28 +114,81 @@ impl <'a> Client<'a> {
     }
 
     /// Log a message to the logs table
-    pub async fn log(&mut self, msg: String, recipient: &str, log_level: LogLevel)
+    /// If this fails, we just log an error internally and proceed.
+    pub async fn log(&mut self, email_id: &uuid::Uuid, msg: &str, log_level: LogLevel) {
+        let query = format!("
+            INSERT INTO {0}
+            (email_id, msg, log_level) VALUES
+            ($1, $2, $3)", &self.log_table
+        );
+
+        let num_rows = sqlx::query(&query)
+                            .bind(email_id)
+                            .bind(msg)
+                            .bind(log_level as i32)
+                            .execute(self.db)
+                            .await;
+
+        if let Err(e) = num_rows {
+            log::error!("Failed to log to DB: {}", e.to_string());
+        }
+    }
+
+    /// Insert an email into DB
+    /// Status and error message must be updated later
+    pub async fn insert_email(&mut self, email: &Email)
         -> Result<(), Box<dyn std::error::Error>> {
-        let is_debug = match log_level {
-            LogLevel::Debug => true,
-            _ => false,
-        };
+        let email_id = &email.uuid;
+        let num_attachments = email.num_attachments.unwrap_or(0);
+
+        // Recipient list should have been filtered down at this point
+        let recipient = &email.recipients[0];
+
+        // TODO
+        // let total_size = email.size;
+        let total_size = email.size;
+
+        let creation_time: DateTime<Utc> = Utc::now();
 
         let query = format!("
-            INSERT INTO {} (user_id, address_id, msg, log_level, is_debug) VALUES
+            INSERT INTO {0} (user_id, address_id, email_id, num_attachments, total_size, creation_time) VALUES
             ((SELECT user_id FROM {1} WHERE address = $1),
-             (SELECT id FROM {1} WHERE address = $1), $2, $3, $4)",
-            &self.log_table, &self.address_table
+             (SELECT id FROM {1} WHERE address = $1), $2, $3, $4, $5)",
+            &self.email_table, &self.address_table
         );
 
         let _num_rows = sqlx::query(&query)
                              .bind(recipient)
-                             .bind(&msg)
-                             .bind(log_level as i32)
-                             .bind(is_debug)
+                             .bind(email_id)
+                             .bind(num_attachments as i32)
+                             .bind(total_size as i32)
+                             .bind(creation_time)
                              .execute(self.db)
                              .await?;
 
         Ok(())
+    }
+
+    /// Update email status (success or failure)
+    pub async fn update_email(&mut self, email: &Email, status: bool,
+                              msg: Option<&str>) {
+        let email_id = &email.uuid;
+
+        let query = format!("
+            UPDATE {}
+            SET status = $1, error_msg = $2
+            WHERE email_id = $3", &self.email_table
+        );
+
+        let num_rows = sqlx::query(&query)
+                            .bind(status)
+                            .bind(msg)
+                            .bind(email_id)
+                            .execute(self.db)
+                            .await;
+
+        if let Err(e) = num_rows {
+            log::error!("Failed to update email: {}", e.to_string());
+        }
     }
 }

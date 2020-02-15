@@ -3,7 +3,10 @@ use chrono::offset::Utc;
 pub mod db;
 pub mod dropbox;
 pub mod email;
+pub mod errors;
 pub mod mailgun;
+
+use errors::VaultyError;
 
 pub struct EmailHandler {
     date: String,
@@ -20,7 +23,7 @@ impl EmailHandler {
     }
 
     pub async fn handle(&self, email: &email::Email, attachment: Option<email::Attachment>)
-        -> Result<(), Box<dyn std::error::Error>> {
+        -> Result<(), VaultyError> {
         log::info!("Handling mail for {}", email.recipients[0]);
         log::info!("Date in UTC: {}", self.date);
 
@@ -41,16 +44,17 @@ impl EmailHandler {
         // 4. Write all attachments to folder via Dropbox API
         if let Some(attachment) = attachment {
             let attachment = attachment.data();
+            let size = attachment.size;
 
             let file_path = format!("{}/{}", storage_path, attachment.name);
             let result = dropbox_client.upload(&file_path, attachment.data, true).await;
 
-            if result.is_err() {
-                log::error!("Failed to upload attachment of size = {}", attachment.size);
-            }
-
-            // Throw away the result
             result.map(|_| ())
+                  .map_err(|e| {
+                      log::error!("Failed to upload attachment of size = {}",
+                                  size);
+                      VaultyError { msg: e.to_string() }
+                  })
         } else {
             // Just dump the email (scrapbook mode!)
             Ok(())

@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use tokio::sync::RwLock;
 use warp::{Rejection, http::Response, reply::Reply};
 
-use vaulty::{email, mailgun, db::{LogLevel}};
+use vaulty::{email, errors::VaultyError, mailgun, db::{LogLevel}};
 
 use super::errors;
 
@@ -26,21 +26,35 @@ pub mod postfix {
          let mut db_client = vaulty::db::Client::new(&mut db);
 
          let recipient = &email.recipients[0];
-         let msg = format!("Got email for recipient {}", recipient);
-         let _ = db_client.log(msg, recipient, LogLevel::Info).await;
+         log::info!("Got email for recipient {}", recipient);
 
          // Get address information for the relevant recipient address
          // Use this to verify that user still has enough quota remaining
          let address = match db_client.get_address(recipient).await {
              Ok(a) => a,
              Err(e) => {
-                 let err = errors::VaultyError { msg: e.to_string() };
+                 let err = errors::VaultyServerError { msg: e.to_string() };
                  return Err(warp::reject::custom(err));
              },
          };
 
          // Increment received email count at the start
-         let _ = db_client.update_address(&address).await;
+         // If this fails, do not proceed with processing this email
+         if let Err(e) = db_client.update_address(&address).await {
+             let err = errors::VaultyServerError { msg: e.to_string() };
+             return Err(warp::reject::custom(err));
+         }
+
+         // Insert this email into DB
+         if let Err(e) = db_client.insert_email(&email).await {
+             log::error!("Failed to insert email: {}", e.to_string());
+
+             let err = errors::VaultyServerError { msg: e.to_string() };
+             return Err(warp::reject::custom(err));
+         }
+
+         let msg = format!("Got email for recipient {}", recipient);
+         db_client.log(&email.uuid, &msg, LogLevel::Info).await;
 
          let uuid = email.uuid.to_string();
          let resp = Response::builder();
@@ -50,11 +64,12 @@ pub mod postfix {
          // TODO(aksiksi): Perform checks here and return HTTP error
          // if any checks failed. This will stop filter from processing
          // any attachments.
+         // Update the email state if validation fails
 
          let result =
              resp.body(format!("{}, {}, {}", email.subject, email.sender, uuid))
                  .map_err(|e| {
-                     let err = errors::VaultyError { msg: e.to_string() };
+                     let err = errors::VaultyServerError { msg: e.to_string() };
                      warp::reject::custom(err)
                  });
 
@@ -87,7 +102,7 @@ pub mod postfix {
 
          let recipient = &email.recipients[0];
          let msg = format!("Got attachment for recipient {}", recipient);
-         let _ = db_client.log(msg, recipient, LogLevel::Info).await;
+         db_client.log(&email.uuid, &msg, LogLevel::Info).await;
 
          // If this is the last attachment for this email, cleanup the cache
          // entry. Get this done early to minimize the chance of leaking an entry.
@@ -114,13 +129,19 @@ pub mod postfix {
 
          let handler = vaulty::EmailHandler::new();
 
-         let resp = handler.handle(&email, Some(attachment)).await
-                           .map(|_| resp)
-                           .map_err(|e| {
-                               let err = errors::VaultyError { msg: e.to_string() };
-                               warp::reject::custom(err)
-                           });
+         let h = handler.handle(&email, Some(attachment)).await;
 
+         if let Err(e) = h.as_ref() {
+             db_client.update_email(&email,
+                                    false,
+                                    Some(&e.to_string())).await;
+         }
+
+         let resp = h.map(|_| resp)
+                     .map_err(|e| {
+                        let err = errors::VaultyServerError { msg: e.to_string() };
+                        warp::reject::custom(err)
+                     });
 
          // TODO: If result contains an error, log this to DB
 
@@ -183,6 +204,7 @@ pub async fn mailgun(content_type: Option<String>, body: String,
                    .map(|a| a.fetch(api_key.as_ref()))
                    .collect::<FuturesUnordered<_>>()
                    .map_ok(|a| email::Attachment::from(a))
+                   .map_err(|e| VaultyError { msg: e.to_string() })
                    .and_then(|a| handler.handle(&mail, Some(a)))
                    .map_err(|_| warp::reject::not_found());
 

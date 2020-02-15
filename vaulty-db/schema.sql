@@ -1,5 +1,7 @@
 SET TIMEZONE = 'America/New_York';
 
+DROP TABLE IF EXISTS logs, addresses, emails, users;
+
 -- Create required tables
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
@@ -26,15 +28,27 @@ CREATE TABLE addresses (
     UNIQUE(address, is_active)
 );
 
--- Store logs, one per user
--- Logs are removed if either the associated address or user is deleted
-CREATE TABLE logs (
+-- Tracks data about each email received by server
+CREATE TABLE emails (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users ON DELETE CASCADE,
     address_id INTEGER REFERENCES addresses ON DELETE CASCADE,
+    email_id UUID NOT NULL,
+    num_attachments INTEGER NOT NULL,
+    total_size INTEGER NOT NULL,
+    status BOOLEAN DEFAULT true, -- Email processed successfully by default
+    error_msg TEXT,
+    last_update_time TIMESTAMPTZ DEFAULT current_timestamp,
+    creation_time TIMESTAMPTZ NOT NULL,
+    UNIQUE(email_id)
+);
+
+-- Logs used for debugging issues
+CREATE TABLE logs (
+    id SERIAL PRIMARY KEY,
+    email_id UUID REFERENCES emails(email_id) ON DELETE CASCADE,
     msg TEXT NOT NULL,
     log_level INTEGER NOT NULL,
-    is_debug BOOLEAN DEFAULT FALSE, -- If TRUE, this log will not be shown to user
     creation_time TIMESTAMPTZ DEFAULT current_timestamp
 );
 
@@ -50,7 +64,12 @@ INSERT INTO addresses
     ('admin@vaulty.net', TRUE, (SELECT id FROM users WHERE email='def@abc.com'), 20000000,
      5000, '2020-02-09 19:38:12-05:00','2020-02-09 19:38:12-05:00');
 
-INSERT INTO logs (user_id, address_id, msg, log_level, is_debug) VALUES
-    (1, 1, 'HELLO THERE 1!', 1, false),
-    (1, 2, 'HELLO THERE 2!', 1, false),
-    (1, 1, 'HELLO THERE 3!', 1, false);
+INSERT INTO emails (user_id, address_id, email_id, num_attachments,
+                      total_size, status, error_msg, creation_time) VALUES
+    (1, 1, '00000000-0000-0000-0000-000000000000', 10, 10000, true,
+     'NO ERROR', '2020-02-09 19:38:12-05:00');
+
+INSERT INTO logs (email_id, msg, log_level) VALUES
+    ('00000000-0000-0000-0000-000000000000', 'HELLO THERE 1!', 1),
+    ('00000000-0000-0000-0000-000000000000', 'HELLO THERE 2!', 1),
+    ('00000000-0000-0000-0000-000000000000', 'HELLO THERE 3!', 1);
