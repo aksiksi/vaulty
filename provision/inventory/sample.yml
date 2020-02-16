@@ -1,0 +1,17 @@
+all:
+  vars:
+    ansible_user: root
+    ansible_python_interpreter: auto_silent
+  children:
+    webservers:
+      hosts:
+        vaulty-web-1:
+          ansible_host: 127.0.0.1
+    dbservers:
+      hosts:
+        vaulty-db-1:
+          ansible_host: 127.0.0.1
+    mailservers:
+      hosts:
+        vaulty-mail-1:
+          ansible_host: 127.0.0.1

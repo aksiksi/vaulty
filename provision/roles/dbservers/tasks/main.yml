@@ -2,8 +2,9 @@
 - name: Install Postgres
   apt:
     pkg:
-      - postgresql
-      - postgresql-contrib
+      - postgresql-11
+      - postgresql-client-11
+      - postgresql-contrib-11
       - libpq-dev
       - python-psycopg2
 - name: Ensure the PostgreSQL service is running
@@ -11,6 +12,24 @@
     name: postgresql
     state: started
     enabled: yes
+- name: Copy "postgres.conf"
+  copy:
+    src: ../files/postgresql.conf
+    dest: /etc/postgresql/11/main/
+    owner: postgres
+    group: postgres
+    mode: u=rw,g=r,o=r
+- name: Template "pg_hba.conf" to allow remote connections
+  template:
+    src: ../templates/pg_hba.conf.j2
+    dest: /etc/postgresql/11/main/pg_hba.conf
+    owner: postgres
+    group: postgres
+    mode: u=rw,g=r,o=r
+- name: Restart Postgres
+  service:
+    name: postgresql
+    state: restarted
 - name: Create DB user and set password
   become: yes
   become_user: postgres
@@ -36,15 +55,21 @@
     priv: "CONNECT"
     role_attr_flags: NOSUPERUSER,NOCREATEDB
 - name: Copy DB schema
+  tags:
+    - update
   copy:
     src: ../vaulty-db/schema.sql
     dest: /etc/vaulty/
     mode: u=rw,g=rw,o=r
 - name: Apply schema
+  tags:
+    - update
   become: yes
   become_user: postgres
   shell: psql -d vaulty -U {{ db_user }} -f /etc/vaulty/schema.sql
 - name: Pull vaulty repo
+  tags:
+    - update
   git:
     repo: 'https://github.com/aksiksi/vaulty.git'
     dest: /var/www/vaulty
