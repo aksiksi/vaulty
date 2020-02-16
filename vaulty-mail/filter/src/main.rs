@@ -32,14 +32,14 @@ struct Opt {
     original_recipients: Vec<String>,
 }
 
-async fn send_attachment(attachment: &vaulty::email::Attachment)
+async fn send_attachment(client: &reqwest::Client,
+                         attachment: &vaulty::email::Attachment)
     -> Result<(), Box<dyn std::error::Error>> {
     log::info!("Processing attachment for email: {}",
                attachment.get_email_id().to_string());
 
     let raw = rmp_serde::encode::to_vec_named(&attachment)?;
 
-    let client = reqwest::Client::new();
     let req = client
         .post("http://127.0.0.1:7777/postfix/attachment")
         .header(reqwest::header::CONTENT_TYPE, attachment.get_mime())
@@ -96,7 +96,7 @@ async fn process(mail: vaulty::email::Email, raw_mail: &[u8],
         // 2. Collect the futures in a `FuturesUnordered`
         // 3. Collect the results into a `Vec`
         attachments.iter()
-                   .map(send_attachment)
+                   .map(|a| send_attachment(&client, a))
                    .collect::<FuturesUnordered<_>>()
                    .collect::<Vec<_>>()
                    .await;
