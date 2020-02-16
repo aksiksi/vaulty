@@ -98,11 +98,11 @@ local   replication     all                                     peer
 host    replication     all             127.0.0.1/32            md5
 host    replication     all             ::1/128                 md5
 
-# Allow trusted remote connections to "vaulty" user from all mail and web servers
+# Allow trusted remote connections to DB user from all mail and web servers
 {% for host in groups['mailservers'] %}
-host    all             vaulty          {{ hostvars[host].ansible_host }}/32              trust
+host    all             {{ db_user }}          {{ hostvars[host].ansible_host }}/32              trust
 {% endfor %}
 
 {% for host in groups['webservers'] %}
-host    all             vaulty          {{ hostvars[host].ansible_host }}/32              trust
+host    all             {{ db_user }}          {{ hostvars[host].ansible_host }}/32              trust
 {% endfor %}
