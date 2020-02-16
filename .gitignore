@@ -10,3 +10,7 @@ Cargo.lock
 
 # Misc
 tmp/
+
+# Ansible vars
+**/defaults/main.yml
+**/vars/main.yml

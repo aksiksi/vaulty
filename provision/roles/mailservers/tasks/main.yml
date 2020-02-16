@@ -1,0 +1,72 @@
+---
+- name: Install Postfix pgsql
+  apt:
+    name: postfix-pgsql
+    state: present
+- name: Build "vaulty-filter" and "vaulty-server" (release)
+  local_action:
+    module: shell
+    cmd: cargo build --release
+    chdir: vaulty-mail
+- name: Copy "vaulty_server" to "/usr/bin"
+  copy:
+    src: ../vaulty-mail/target/release/vaulty_server
+    dest: /usr/bin
+    mode: u=rwx,g=rwx,o=rwx
+- name: Copy "vaulty_filter" to "/usr/bin"
+  copy:
+    src: ../vaulty-mail/target/release/vaulty_filter
+    dest: /usr/bin
+    mode: u=rwx,g=rwx,o=rwx
+- name: Install Postfix
+  apt:
+    name: postfix
+    state: present
+- name: Ensure mail group exists
+  group:
+    name: "{{ mail_group }}"
+    gid: "{{ mail_gid }}"
+    state: present
+- name: Create mail user and assign to group
+  user:
+    name: "{{ mail_user }}"
+    uid: "{{ mail_uid }}"
+    group: "{{ mail_group }}"
+    home: "{{ mail_dir }}"
+    move_home: true
+    create_home: true
+    state: present
+- name: Copy Postfix configs to "/etc/postfix"
+  copy:
+    src: "{{ item }}"
+    dest: /etc/postfix
+  loop:
+    - vaulty-mail/setup/postfix/master.cf
+    - vaulty-mail/setup/postfix/main.cf
+    - vaulty-mail/setup/postfix/vmail
+    - vaulty-mail/setup/postfix/virtual
+# vmail: converts a recipient mail address to a mailbox
+# virtual: specifies certain virtual addresses that need forwarding
+# TODO: Convert vmail to use Postgres lookup
+- name: Rebuild virtual mailbox and alias maps
+  shell: |
+    /usr/sbin/postmap /etc/postfix/vmail
+    /usr/sbin/postmap /etc/postfix/virtual
+- name: Rebuild vmail DB
+  shell: /usr/sbin/postmap /etc/postfix/vmail
+- name: Reload Postfix configs
+  shell: postfix reload
+- name: Copy "vaulty_server" systemd unit
+  copy:
+    src: ../vaulty-mail/server/resources/vaulty.service
+    dest: /etc/systemd/system/
+- name: Copy "vaulty_server" conf file
+  copy:
+    src: ../vaulty-mail/server/resources/vaulty.conf
+    dest: /etc/vaulty/
+- name: Enable and start vaulty service
+  systemd:
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+    name: vaulty

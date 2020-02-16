@@ -1,0 +1,25 @@
+# Run: ansible-playbook -i ~/hosts provision.yml
+---
+- name: Common tasks
+  hosts: all
+  tasks:
+    - import_role:
+        name: common
+
+- name: Provision web servers
+  hosts: webservers
+  tasks:
+    - import_role:
+        name: webservers
+
+- name: Provision DB server
+  hosts: dbservers
+  tasks:
+    - import_role:
+        name: dbservers
+
+- name: Provision mail servers
+  hosts: mailservers
+  tasks:
+    - import_role:
+        name: mailservers

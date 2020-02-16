@@ -1,0 +1,19 @@
+# Run: ansible-playbook -i ~/hosts provision.yml
+---
+- name: Install git
+  apt:
+    name: git
+    state: present
+- name: Install rsync
+  apt:
+    name: rsync
+    state: present
+- name: Install fail2ban
+  apt:
+    name: fail2ban
+    state: present
+- name: Configure fail2ban
+  copy:
+    remote_src: yes
+    src: /etc/fail2ban/jail.conf
+    dest: /etc/fail2ban/jail.local
