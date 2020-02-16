@@ -60,10 +60,17 @@
   copy:
     src: ../files/vaulty.service
     dest: /etc/systemd/system/
-- name: Copy "vaulty_server" conf file
+- name: Copy "vaulty_server" env file
   copy:
-    src: ../files/vaulty.conf
+    src: ../files/vaulty.env
     dest: /etc/vaulty/
+- name: Template "vaulty_server" config file
+  template:
+    src: ../templates/vaulty.toml.j2
+    dest: /etc/vaulty/vaulty.toml
+    owner: postgres
+    group: postgres
+    mode: u=rw,g=r,o=r
 - name: Enable and start vaulty service
   systemd:
     state: restarted

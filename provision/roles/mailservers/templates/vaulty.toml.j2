@@ -1,0 +1,10 @@
+# Vaulty config file in TOML format
+
+# port = 7777
+db_name = "{{ vaulty_db_name }}"
+
+# Just take first DB server
+db_host = "{{ hostvars[groups['dbservers'][0]].ansible_host }}"
+# db_host = USER
+# db_password = PASSWORD
+# mailgun_key = YOUR_TOKEN

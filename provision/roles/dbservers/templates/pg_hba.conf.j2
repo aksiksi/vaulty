@@ -100,9 +100,9 @@ host    replication     all             ::1/128                 md5
 
 # Allow trusted remote connections to DB user from all mail and web servers
 {% for host in groups['mailservers'] %}
-host    all             {{ db_user }}          {{ hostvars[host].ansible_host }}/32              trust
+host    all             {{ vaulty_db_user }}          {{ hostvars[host].ansible_host }}/32              trust
 {% endfor %}
 
 {% for host in groups['webservers'] %}
-host    all             {{ db_user }}          {{ hostvars[host].ansible_host }}/32              trust
+host    all             {{ vaulty_db_user }}          {{ hostvars[host].ansible_host }}/32              trust
 {% endfor %}

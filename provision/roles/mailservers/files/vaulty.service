@@ -3,7 +3,7 @@ Description=Vaulty Server
 After=postfix.target network.target
 
 [Service]
-EnvironmentFile=/etc/vaulty/vaulty.conf
+EnvironmentFile=/etc/vaulty/vaulty.env
 ExecStart=/usr/bin/vaulty_server
 ExecStop=pkill vaulty_server
 User=vmail
