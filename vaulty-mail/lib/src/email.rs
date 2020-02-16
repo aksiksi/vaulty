@@ -8,7 +8,7 @@ pub struct Email {
     /// Email metadata
     pub sender: String,
     pub recipients: Vec<String>,
-    pub subject: String,
+    pub subject: Option<String>,
 
     /// Plaintext body
     pub body: String,
@@ -34,6 +34,9 @@ pub struct Email {
     ///
     /// This ties an email to its attachments.
     pub uuid: uuid::Uuid,
+
+    /// Message-ID for this email, if found
+    pub message_id: Option<String>,
 }
 
 /// A single attachment.
@@ -146,23 +149,17 @@ impl Email {
                                       ["Subject", "Message-ID"].contains(&k.as_str())
                                   })
                                   .map(|h| {
-                                      (h.get_key().unwrap(), h.get_value().unwrap())
+                                      (h.get_key().unwrap(), h.get_value().ok())
                                   });
 
         for (k, v) in headers {
             if k == "Subject" {
                 self.subject = v;
             } else if k == "Message-ID" {
-                // Build UUID based on message ID (type 5)
-                let message_id = v.replace("<", "").replace(">", "");
-
-                // First, we generate a namespace UUID based on the standard
-                // URL namespace
-                let namespace = uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL,
-                                                   UUID_NAMESPACE.as_bytes());
-
-                // Now generate a v5 UUID for this email based on it Message-ID
-                self.uuid = uuid::Uuid::new_v5(&namespace, message_id.as_bytes());
+                // Extract message ID, if available
+                self.message_id = v.map(|s| {
+                    s.replace("<", "").replace(">", "")
+                });
             }
         }
     }

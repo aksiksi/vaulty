@@ -59,7 +59,7 @@ pub mod postfix {
          let uuid = email.uuid.to_string();
          let resp = Response::builder();
 
-         log::info!("{}, {}, {}", email.subject, email.sender, uuid);
+         log::info!("{}, {}", email.sender, uuid);
 
          // TODO(aksiksi): Perform checks here and return HTTP error
          // if any checks failed. This will stop filter from processing
@@ -67,7 +67,7 @@ pub mod postfix {
          // Update the email state if validation fails
 
          let result =
-             resp.body(format!("{}, {}, {}", email.subject, email.sender, uuid))
+             resp.body(format!("{}, {}", email.sender, uuid))
                  .map_err(|e| {
                      let err = errors::VaultyServerError { msg: e.to_string() };
                      warp::reject::custom(err)

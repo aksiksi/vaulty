@@ -74,7 +74,7 @@ impl From<Email> for crate::email::Email {
         crate::email::Email {
             sender: email.sender,
             recipients: recipients,
-            subject: email.subject,
+            subject: Some(email.subject),
             body: email.body,
             body_html: Some(email.body_html),
             attachments: None,
