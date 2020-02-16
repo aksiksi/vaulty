@@ -394,7 +394,7 @@ mod test {
         let mail = get_mail(mail_path);
 
         assert_eq!(mail.body, "AAFAFAF\n\n");
-        assert_eq!(mail.subject, "ABC");
+        assert_eq!(mail.subject.unwrap(), "ABC");
     }
 
     #[test]
