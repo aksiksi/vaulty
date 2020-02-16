@@ -16,29 +16,19 @@ async fn main() {
     let matches = App::new("vaulty_server")
                   .version("0.1")
                   .author("Assil Ksiksi")
-                  .arg(Arg::with_name("port")
-                       .short("p")
-                       .long("port")
-                       .help("HTTP server port")
-                       .value_name("PORT")
-                       .default_value("7777")
-                       .takes_value(true))
-                  .arg(Arg::with_name("mailgun_key")
-                       .short("m")
-                       .long("mailgun-key")
-                       .help("Mailgun API key")
-                       .value_name("KEY")
-                       .default_value("NONE")
+                  .arg(Arg::with_name("config_path")
+                       .short("c")
+                       .long("config-path")
+                       .help("Path to Vaulty config")
+                       .value_name("CONFIG_PATH")
+                       .default_value(vaulty::config::DEFAULT_PATH)
                        .takes_value(true))
                   .get_matches();
 
-    // TODO: Only bring up Tokio runtime for HTTP server
-    // Makes no sense to add startup time overhead for the filter, since
-    // the expectation that it will called once per email by Postfix
-    let arg = config::HttpArg {
-        port: matches.value_of("port").unwrap().parse::<u16>().unwrap(),
-        mailgun_key: matches.value_of("mailgun_key").map(|a| a.to_string()),
-    };
+    // Load config
+    let config_path = matches.value_of("config_path");
+    let arg = config::Config::load(config_path);
+    log::info!("Loaded config from {:?}", config_path);
 
     log::info!("Starting vaulty_server...");
 

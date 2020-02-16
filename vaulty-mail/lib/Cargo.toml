@@ -15,6 +15,7 @@ bytes = "0.5.3"
 mailparse = "0.10.2"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 sqlx = { version = "0.2", default-features = false, features = [ "runtime-tokio", "macros", "postgres", "chrono", "uuid" ] }
+config = { version = "0.10.1", default-features = false, features = ["toml"] }
 
 [dev-dependencies]
 tokio = { version = "0.2.6", features = ["full"] }
