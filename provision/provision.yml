@@ -2,24 +2,32 @@
 ---
 - name: Common tasks
   hosts: all
+  tags:
+    - common
   tasks:
     - import_role:
         name: common
 
 - name: Provision web servers
   hosts: webservers
+  tags:
+    - web
   tasks:
     - import_role:
         name: webservers
 
 - name: Provision DB server
   hosts: dbservers
+  tags:
+    - db
   tasks:
     - import_role:
         name: dbservers
 
 - name: Provision mail servers
   hosts: mailservers
+  tags:
+    - mail
   tasks:
     - import_role:
         name: mailservers

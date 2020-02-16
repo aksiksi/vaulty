@@ -7,7 +7,7 @@
   local_action:
     module: shell
     cmd: cargo build --release
-    chdir: vaulty-mail
+    chdir: ../vaulty-mail
 - name: Copy "vaulty_server" to "/usr/bin"
   copy:
     src: ../vaulty-mail/target/release/vaulty_server
@@ -41,10 +41,10 @@
     src: "{{ item }}"
     dest: /etc/postfix
   loop:
-    - vaulty-mail/setup/postfix/master.cf
-    - vaulty-mail/setup/postfix/main.cf
-    - vaulty-mail/setup/postfix/vmail
-    - vaulty-mail/setup/postfix/virtual
+    - ../files/postfix/master.cf
+    - ../files/postfix/main.cf
+    - ../files/postfix/vmail
+    - ../files/postfix/virtual
 # vmail: converts a recipient mail address to a mailbox
 # virtual: specifies certain virtual addresses that need forwarding
 # TODO: Convert vmail to use Postgres lookup
@@ -58,11 +58,11 @@
   shell: postfix reload
 - name: Copy "vaulty_server" systemd unit
   copy:
-    src: ../vaulty-mail/server/resources/vaulty.service
+    src: ../files/vaulty.service
     dest: /etc/systemd/system/
 - name: Copy "vaulty_server" conf file
   copy:
-    src: ../vaulty-mail/server/resources/vaulty.conf
+    src: ../files/vaulty.conf
     dest: /etc/vaulty/
 - name: Enable and start vaulty service
   systemd:
