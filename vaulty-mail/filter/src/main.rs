@@ -1,3 +1,4 @@
+use std::env;
 use std::io::Read;
 use std::process::Stdio;
 
@@ -32,7 +33,7 @@ struct Opt {
     original_recipients: Vec<String>,
 }
 
-async fn send_attachment(client: &reqwest::Client,
+async fn send_attachment(remote_addr: &str, client: &reqwest::Client,
                          attachment: &vaulty::email::Attachment)
     -> Result<(), Box<dyn std::error::Error>> {
     log::info!("Processing attachment for email: {}",
@@ -41,7 +42,7 @@ async fn send_attachment(client: &reqwest::Client,
     let raw = rmp_serde::encode::to_vec_named(&attachment)?;
 
     let req = client
-        .post("http://127.0.0.1:7777/postfix/attachment")
+        .post(&format!("http://{}:7777/postfix/attachment", remote_addr))
         .header(reqwest::header::CONTENT_TYPE, attachment.get_mime())
         .basic_auth(VAULTY_USER, Some(VAULTY_PASS))
         .body(reqwest::Body::from(raw));
@@ -57,7 +58,7 @@ async fn send_attachment(client: &reqwest::Client,
 }
 
 /// Transmit this email to the Vaulty processing server
-async fn process(mail: vaulty::email::Email, raw_mail: &[u8],
+async fn process(remote_addr: &str, mail: vaulty::email::Email, raw_mail: &[u8],
                  original_recipients: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     // Any mail destined for "postmaster" (or equivalent) must be injected
     // back into Postfix. The recipient would have already been remapped using
@@ -83,7 +84,7 @@ async fn process(mail: vaulty::email::Email, raw_mail: &[u8],
     let email = serde_json::to_string(&mail)?;
 
     let req = client
-        .post("http://127.0.0.1:7777/postfix/email")
+        .post(&format!("http://{}:7777/postfix/email", remote_addr))
         .basic_auth(VAULTY_USER, Some(VAULTY_PASS))
         .body(reqwest::Body::from(email));
 
@@ -96,7 +97,7 @@ async fn process(mail: vaulty::email::Email, raw_mail: &[u8],
         // 2. Collect the futures in a `FuturesUnordered`
         // 3. Collect the results into a `Vec`
         attachments.iter()
-                   .map(|a| send_attachment(&client, a))
+                   .map(|a| send_attachment(&remote_addr, &client, a))
                    .collect::<FuturesUnordered<_>>()
                    .collect::<Vec<_>>()
                    .await;
@@ -107,6 +108,11 @@ async fn process(mail: vaulty::email::Email, raw_mail: &[u8],
 
 #[tokio::main]
 async fn main() {
+    let remote_addr = match env::var("VAULTY_SERVER_ADDR") {
+        Ok(v) => v,
+        Err(_) => "127.0.0.1".to_string(),
+    };
+
     // Init logger
     env_logger::builder().format_timestamp_micros().init();
 
@@ -123,7 +129,7 @@ async fn main() {
                                     .with_sender(opt.sender)
                                     .with_recipients(opt.recipients);
 
-    process(mail, email_content.as_bytes(), opt.original_recipients)
+    process(&remote_addr, mail, email_content.as_bytes(), opt.original_recipients)
         .await
         .unwrap();
 }
