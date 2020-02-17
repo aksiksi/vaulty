@@ -9,23 +9,31 @@ pub mod mailgun;
 
 use errors::VaultyError;
 
-pub struct EmailHandler {
+pub struct EmailHandler<'a> {
     date: String,
-    // TODO: GDrive client, PGSQL client, etc.
+    storage_token: &'a str,
+    storage_backend: &'a str,
+    storage_path: &'a str,
 }
 
-impl EmailHandler {
-    pub fn new() -> Self {
+impl<'a> EmailHandler<'a> {
+    pub fn new(token: &'a str, backend: &'a str, path: &'a str) -> Self {
         Self {
+            storage_token: token,
+            storage_backend: backend,
+            storage_path: path,
+
             // TODO: Figure out user's date from email
             // Will be used for naming scrapbook entries
             date: Utc::today().format("%F").to_string(),
         }
     }
 
-    pub async fn handle(&self, email: &email::Email, attachment: Option<email::Attachment>)
+    pub async fn handle(&self, email: &email::Email,
+                        attachment: Option<email::Attachment>)
         -> Result<(), VaultyError> {
-        log::info!("Handling mail for {}", email.recipients[0]);
+        log::info!("Handling mail for {} on {}",
+                   email.recipients[0], self.storage_backend);
         log::info!("Date in UTC: {}", self.date);
 
         // 1. Figure out if user is valid and active
@@ -33,9 +41,7 @@ impl EmailHandler {
 
         // 2. Get user's token and storage location
         // NOTE: Assume the path exists
-        let dropbox_token = std::env::var("DROPBOX_TOKEN").unwrap();
-        let dropbox_client = dropbox::Client::from_token(dropbox_token);
-        let storage_path = "/vaulty";
+        let client = dropbox::Client::from_token(self.storage_token);
 
         // 3. Check what user has configured
         // - Attachments only vs. email content
@@ -47,8 +53,8 @@ impl EmailHandler {
             let attachment = attachment.data();
             let size = attachment.size;
 
-            let file_path = format!("{}/{}", storage_path, attachment.name);
-            let result = dropbox_client.upload(&file_path, attachment.data, true).await;
+            let file_path = format!("{}/{}", self.storage_path, attachment.name);
+            let result = client.upload(&file_path, attachment.data, true).await;
 
             result.map(|_| ())
                   .map_err(|e| {

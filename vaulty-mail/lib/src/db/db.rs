@@ -23,12 +23,16 @@ impl From<i32> for LogLevel {
 }
 
 /// Single address row in DB
+#[derive(Clone)]
 pub struct Address {
     pub address: String,
     pub user_id: i32,
     pub max_email_size: i32,
     pub quota: i32,
     pub received: i32,
+    pub storage_token: String,
+    pub storage_backend: String,
+    pub storage_path: String,
     pub last_renewal_time: DateTime<Utc>,
 }
 
@@ -89,14 +93,17 @@ impl <'a> Client<'a> {
             max_email_size: row.get("max_email_size"),
             quota: row.get("quota"),
             received: row.get("received"),
+            storage_token: row.get("storage_token"),
+            storage_backend: row.get("storage_backend"),
+            storage_path: row.get("storage_path"),
             last_renewal_time: row.get("last_renewal_time"),
         };
 
         Ok(address)
     }
 
-    /// Update an address with new info
-    pub async fn update_address(&mut self, address: &Address)
+    /// Update address mail received count
+    pub async fn update_address_received_count(&mut self, address: &Address)
         -> Result<(), Box<dyn std::error::Error>> {
         // For now, just increment the received count
         let query = format!("

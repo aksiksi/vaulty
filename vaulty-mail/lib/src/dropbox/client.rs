@@ -4,20 +4,13 @@ use reqwest::header::{CONTENT_TYPE};
 
 use super::api;
 
-pub struct Client {
-    token: String,
+pub struct Client<'a> {
+    token: &'a str,
     client: reqwest::Client,
 }
 
-impl Client {
-    pub fn new() -> Self {
-        Self {
-            token: String::new(),
-            client: reqwest::Client::new(),
-        }
-    }
-
-    pub fn from_token(token: String) -> Self {
+impl<'a> Client<'a> {
+    pub fn from_token(token: &'a str) -> Self {
         Self {
             token: token,
             client: reqwest::Client::new(),
@@ -73,15 +66,12 @@ impl Client {
 mod tests {
     use super::*;
 
-    fn get_client() -> Client {
-        let token = std::env::var("DROPBOX_TOKEN")
-                             .expect("No Dropbox token found");
-        Client::from_token(token)
-    }
-
     #[tokio::test]
     async fn test_list_folder() {
-        let client = get_client();
+        let token = std::env::var("DROPBOX_TOKEN")
+                             .expect("No Dropbox token found");
+        let client = Client::from_token(&token);
+
         let result = client.list_folder("").await;
 
         println!("{:?}", result);
@@ -90,7 +80,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_folder() {
-        let client = get_client();
+        let token = std::env::var("dropbox_token")
+                             .expect("no dropbox token found");
+        let client = Client::from_token(&token);
+
         let result = client.create_folder("/abcde").await;
 
         println!("{:?}", result);
@@ -98,8 +91,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_file_upload() {
-        let client = get_client();
+        let token = std::env::var("dropbox_token")
+                             .expect("no dropbox token found");
+        let client = Client::from_token(&token);
         let data = String::from("Hello there!").into_bytes();
+
         let result = client.upload("/vaulty_test.txt", data, true).await;
 
         println!("{:?}", result);
@@ -109,7 +105,10 @@ mod tests {
     #[tokio::test]
     /// /vaulty/search1 -> "test/", "test123/"
     async fn test_search_folders() {
-        let client = get_client();
+        let token = std::env::var("dropbox_token")
+                             .expect("no dropbox token found");
+        let client = Client::from_token(&token);
+
         let result = client.search("/vaulty/search1", "test").await;
 
         println!("{:?}", result);
@@ -119,7 +118,10 @@ mod tests {
     #[tokio::test]
     /// /vaulty/search2 -> "test", "test123", "test/"
     async fn test_search_files_and_folders() {
-        let client = get_client();
+        let token = std::env::var("dropbox_token")
+                             .expect("no dropbox token found");
+        let client = Client::from_token(&token);
+
         let result = client.search("/vaulty/search2", "test").await;
 
         println!("{:?}", result);

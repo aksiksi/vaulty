@@ -9,12 +9,15 @@ use vaulty::{email, errors::VaultyError, mailgun, db::{LogLevel}};
 
 use super::errors;
 
+// Cache entry is cloneable to reduce read lock hold time
+#[derive(Clone)]
+struct CacheEntry {
+    pub email: email::Email,
+    pub address: vaulty::db::Address,
+}
+
 lazy_static! {
-    // NOTE: Might make sense to include `Address` with the cache entry.
-    // One advantage is we can find the target recipient address from
-    // the list of recipients once, then use the `Address` info in attachments
-    // processing.
-    static ref MAIL_CACHE: RwLock<HashMap<String, vaulty::email::Email>> =
+    static ref MAIL_CACHE: RwLock<HashMap<String, CacheEntry>> =
         RwLock::new(HashMap::new());
 }
 
@@ -43,7 +46,7 @@ pub mod postfix {
 
          // Increment received email count at the start
          // If this fails, do not proceed with processing this email
-         if let Err(e) = db_client.update_address(&address).await {
+         if let Err(e) = db_client.update_address_received_count(&address).await {
              let msg = e.to_string();
              log::error!("{}", msg);
              let err = errors::VaultyServerError { msg: msg };
@@ -83,8 +86,14 @@ pub mod postfix {
          // Create a cache entry if email has attachments
          if let Some(_) = email.num_attachments {
              log::info!("Creating cache entry for {}", email.uuid);
+
+             let entry = CacheEntry {
+                 email: email,
+                 address: address,
+             };
+
              let mut cache = MAIL_CACHE.write().await;
-             cache.insert(uuid.clone(), email);
+             cache.insert(uuid.clone(), entry);
          }
 
          result
@@ -103,10 +112,13 @@ pub mod postfix {
 
          // Acquire cache read lock and clone email
          // This minimizes read lock time
-         let email = {
+         let entry = {
              let cache = MAIL_CACHE.read().await;
              cache.get(&uuid).unwrap().clone()
          };
+
+         let email = &entry.email;
+         let address = &entry.address;
 
          let recipient = &email.recipients[0];
          let msg = format!("Got attachment for recipient {}", recipient);
@@ -116,8 +128,8 @@ pub mod postfix {
          // entry. Get this done early to minimize the chance of leaking an entry.
          {
              let mut cache = MAIL_CACHE.write().await;
-             let mail = &mut cache.get_mut(&uuid).unwrap();
-             let attachment_count = mail.num_attachments.as_mut().unwrap();
+             let e = &mut cache.get_mut(&uuid).unwrap();
+             let attachment_count = e.email.num_attachments.as_mut().unwrap();
 
              *attachment_count -= 1;
 
@@ -135,9 +147,13 @@ pub mod postfix {
                     attachment.get_name(), recipient, attachment.get_size(), uuid)
          ).unwrap();
 
-         let handler = vaulty::EmailHandler::new();
+         let handler = vaulty::EmailHandler::new(
+             &address.storage_token,
+             &address.storage_backend,
+             &address.storage_path
+         );
 
-         let h = handler.handle(&email, Some(attachment)).await;
+         let h = handler.handle(email, Some(attachment)).await;
 
          if let Err(e) = h.as_ref() {
              db_client.update_email(&email,
@@ -205,7 +221,11 @@ pub async fn mailgun(content_type: Option<String>, body: String,
     }
 
     let mail: email::Email = mail.into();
-    let handler = vaulty::EmailHandler::new();
+    let handler = vaulty::EmailHandler::new(
+        "test123",
+        "dropbox",
+        "/vaulty",
+    );
 
     let attachment_tasks =
         attachments.into_iter()

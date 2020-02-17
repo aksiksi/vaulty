@@ -54,13 +54,21 @@
     name: "{{ vaulty_db_user }}"
     priv: "CONNECT"
     role_attr_flags: NOSUPERUSER,NOCREATEDB
-- name: Copy DB schema
+- name: Copy DB schema (as a template)
   tags:
     - update
-  copy:
+  template:
     src: ../vaulty-db/schema.sql
     dest: /etc/vaulty/
     mode: u=rw,g=rw,o=r
+- name: Copy DB schema locally
+  tags:
+    - update
+  template:
+    src: ../vaulty-db/schema.sql
+    dest: /tmp/
+    mode: u=rw,g=rw,o=r
+  delegate_to: localhost
 - name: Apply schema
   tags:
     - update
