@@ -9,6 +9,7 @@ pub const VAULTY_PASS: &str = "test123";
 
 const DEFAULT_PORT: u16 = 7777;
 const DEFAULT_DB_NAME: &str = "vaulty";
+const DEFAULT_DB_USER: &str = "vaulty";
 
 #[derive(Debug, Default)]
 pub struct Config {
@@ -16,7 +17,7 @@ pub struct Config {
     pub mailgun_key: Option<String>,
     pub db_name: String,
     pub db_host: String,
-    pub db_user: Option<String>,
+    pub db_user: String,
     pub db_password: Option<String>,
 }
 
@@ -41,7 +42,9 @@ impl From<HashMap<String, String>> for Config {
         config.db_name = settings.get("db_name")
                                  .unwrap_or(&DEFAULT_DB_NAME.to_string())
                                  .to_string();
-        config.db_user = settings.get("db_user").map(String::from);
+        config.db_user = settings.get("db_user")
+                                 .unwrap_or(&DEFAULT_DB_USER.to_string())
+                                 .to_string();
         config.db_password = settings.get("db_password").map(String::from);
 
         config

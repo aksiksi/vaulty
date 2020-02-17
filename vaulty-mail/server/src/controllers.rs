@@ -33,7 +33,10 @@ pub mod postfix {
          let address = match db_client.get_address(recipient).await {
              Ok(a) => a,
              Err(e) => {
-                 let err = errors::VaultyServerError { msg: e.to_string() };
+                 let msg = e.to_string();
+                 log::error!("{}", msg);
+                 let err = errors::VaultyServerError { msg: msg };
+
                  return Err(warp::reject::custom(err));
              },
          };
@@ -41,15 +44,19 @@ pub mod postfix {
          // Increment received email count at the start
          // If this fails, do not proceed with processing this email
          if let Err(e) = db_client.update_address(&address).await {
-             let err = errors::VaultyServerError { msg: e.to_string() };
+             let msg = e.to_string();
+             log::error!("{}", msg);
+             let err = errors::VaultyServerError { msg: msg };
+
              return Err(warp::reject::custom(err));
          }
 
          // Insert this email into DB
          if let Err(e) = db_client.insert_email(&email).await {
-             log::error!("Failed to insert email: {}", e.to_string());
+             let msg = e.to_string();
+             log::error!("{}", msg);
+             let err = errors::VaultyServerError { msg: msg };
 
-             let err = errors::VaultyServerError { msg: e.to_string() };
              return Err(warp::reject::custom(err));
          }
 
@@ -75,6 +82,7 @@ pub mod postfix {
 
          // Create a cache entry if email has attachments
          if let Some(_) = email.num_attachments {
+             log::info!("Creating cache entry for {}", email.uuid);
              let mut cache = MAIL_CACHE.write().await;
              cache.insert(uuid.clone(), email);
          }
@@ -114,7 +122,7 @@ pub mod postfix {
              *attachment_count -= 1;
 
              if *attachment_count == 0 {
-                 log::info!("Removing email {} from cache", uuid);
+                 log::info!("Removing {} from cache", uuid);
                  cache.remove(&uuid);
              }
          }

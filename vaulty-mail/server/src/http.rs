@@ -7,16 +7,15 @@ use super::routes;
 pub async fn get_db_pool(arg: &config::Config) -> sqlx::PgPool {
     let db_host = &arg.db_host;
     let db_name = &arg.db_name;
+    let db_user = &arg.db_user;
 
     let db_path =
-        if arg.db_user.is_some() {
-            let db_user = arg.db_user.as_ref().unwrap();
+        if arg.db_password.is_some() {
             let db_password = arg.db_password.as_ref().unwrap();
-
             format!("postgres://{}:{}@{}/{}",
                     db_user, db_password, db_host, db_name)
         } else {
-            format!("postgres://{}/{}", db_host, db_name)
+            format!("postgres://{}@{}/{}", db_user, db_host, db_name)
         };
 
     sqlx::PgPool::new(&db_path).await.unwrap()

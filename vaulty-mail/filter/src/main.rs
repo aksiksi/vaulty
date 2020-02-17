@@ -10,9 +10,15 @@ use futures::stream::{FuturesUnordered, StreamExt};
 
 use structopt::StructOpt;
 
-// TODO: Migrate to file or DB lookup in `basic_auth`
-const VAULTY_USER: &str = "admin";
-const VAULTY_PASS: &str = "test123";
+use lazy_static::lazy_static;
+
+// TODO: Can we make this more flexible?
+lazy_static! {
+    static ref VAULTY_USER: String = env::var("VAULTY_USER")
+                                         .expect("No auth username found!");
+    static ref VAULTY_PASS: String = env::var("VAULTY_PASS")
+                                         .expect("No auth username found!");
+}
 
 const VALID_RECIPIENTS: &[&str] = &[
     "postmaster@vaulty.net",
@@ -44,12 +50,11 @@ async fn send_attachment(remote_addr: &str, client: &reqwest::Client,
     let req = client
         .post(&format!("http://{}:7777/postfix/attachment", remote_addr))
         .header(reqwest::header::CONTENT_TYPE, attachment.get_mime())
-        .basic_auth(VAULTY_USER, Some(VAULTY_PASS))
+        .basic_auth(VAULTY_USER.as_str(), Some(VAULTY_PASS.as_str()))
         .body(reqwest::Body::from(raw));
 
     let resp = req.send().await?;
     let bytes = &resp.bytes().await?;
-
     let resp_str = std::str::from_utf8(bytes)?;
 
     log::info!("{}", resp_str);
@@ -85,12 +90,20 @@ async fn process(remote_addr: &str, mail: vaulty::email::Email, raw_mail: &[u8],
 
     let req = client
         .post(&format!("http://{}:7777/postfix/email", remote_addr))
-        .basic_auth(VAULTY_USER, Some(VAULTY_PASS))
+        .basic_auth(VAULTY_USER.as_str(), Some(VAULTY_PASS.as_str()))
         .body(reqwest::Body::from(email));
 
     let resp = req.send().await?;
+    let status = resp.status().is_success();
 
-    assert!(resp.status().is_success());
+    let bytes = &resp.bytes().await?;
+    let resp_str = std::str::from_utf8(bytes)?;
+
+    if !status {
+        log::error!("Failed to process email {} with: \"{}\"",
+                    mail.uuid, resp_str);
+        return Err("Failed to process email".into());
+    }
 
     if let Some(attachments) = &mail.attachments {
         // 1. Create an iterator of `Future<Result<_, _>>`
