@@ -80,8 +80,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_folder() {
-        let token = std::env::var("dropbox_token")
-                             .expect("no dropbox token found");
+        let token = std::env::var("DROPBOX_TOKEN")
+                             .expect("No Dropbox token found");
         let client = Client::from_token(&token);
 
         let result = client.create_folder("/abcde").await;
@@ -91,8 +91,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_file_upload() {
-        let token = std::env::var("dropbox_token")
-                             .expect("no dropbox token found");
+        let token = std::env::var("DROPBOX_TOKEN")
+                             .expect("No Dropbox token found");
         let client = Client::from_token(&token);
         let data = String::from("Hello there!").into_bytes();
 
@@ -105,8 +105,8 @@ mod tests {
     #[tokio::test]
     /// /vaulty/search1 -> "test/", "test123/"
     async fn test_search_folders() {
-        let token = std::env::var("dropbox_token")
-                             .expect("no dropbox token found");
+        let token = std::env::var("DROPBOX_TOKEN")
+                             .expect("No Dropbox token found");
         let client = Client::from_token(&token);
 
         let result = client.search("/vaulty/search1", "test").await;
@@ -118,8 +118,8 @@ mod tests {
     #[tokio::test]
     /// /vaulty/search2 -> "test", "test123", "test/"
     async fn test_search_files_and_folders() {
-        let token = std::env::var("dropbox_token")
-                             .expect("no dropbox token found");
+        let token = std::env::var("DROPBOX_TOKEN")
+                             .expect("No Dropbox token found");
         let client = Client::from_token(&token);
 
         let result = client.search("/vaulty/search2", "test").await;
