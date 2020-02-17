@@ -1,4 +1,3 @@
-# Run: ansible-playbook -i ~/hosts provision.yml
 ---
 - name: Install git
   apt:
@@ -12,8 +11,12 @@
   apt:
     name: fail2ban
     state: present
-- name: Configure fail2ban
+- name: Copy basic fail2ban SSH config
   copy:
-    remote_src: yes
-    src: /etc/fail2ban/jail.conf
+    src: ../files/jail.local
     dest: /etc/fail2ban/jail.local
+    mode: u=rw,g=rw,o=rw
+- name: Reload fail2ban
+  service:
+    name: fail2ban
+    state: reloaded
