@@ -18,12 +18,11 @@ smtpd_use_tls=yes
 smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
 smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
 
-mydomain = vaulty.net
+mydomain = {{ vaulty_domain }}
 alias_maps = hash:/etc/aliases
 alias_database = hash:/etc/aliases
 myorigin = $mydomain
-# TODO: Make this baby dynamic
-myhostname = vaulty-mail-1
+myhostname = {{ inventory_hostname }}
 mydestination = $myhostname, localhost.$mydomain, localhost.localdomain, localhost
 mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128 172.0.0.0/8 192.168.0.0/16
 relayhost =
@@ -33,16 +32,16 @@ recipient_delimiter = +
 inet_interfaces = all
 default_transport = error
 relay_transport = error
-export_environment = TZ RUST_LOG=info
+export_environment = {{ postfix_env }}
 
 # Virtual mailbox config
 virtual_transport = vaulty_filter:
 virtual_mailbox_domains = $mydomain, mail.$mydomain
-virtual_mailbox_base = /var/vmail
-virtual_mailbox_maps = hash:/etc/postfix/vmail
+virtual_mailbox_base = {{ mail_dir }}
+virtual_mailbox_maps = pgsql:/etc/postfix/pgsql-vmail.cf
 virtual_alias_maps = hash:/etc/postfix/virtual
-virtual_uid_maps = static:5000
-virtual_gid_maps = static:5000
+virtual_uid_maps = static:{{ mail_uid }}
+virtual_gid_maps = static:{{ mail_gid }}
 
 # Security and throttling
 smtpd_relay_restrictions =

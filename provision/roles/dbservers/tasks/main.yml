@@ -26,10 +26,10 @@
     owner: postgres
     group: postgres
     mode: u=rw,g=r,o=r
-- name: Restart Postgres
+- name: Reload Postgres
   service:
     name: postgresql
-    state: restarted
+    state: reloaded
 - name: Create DB user and set password
   become: yes
   become_user: postgres

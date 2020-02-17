@@ -42,18 +42,24 @@
     dest: /etc/postfix
   loop:
     - ../files/postfix/master.cf
-    - ../files/postfix/main.cf
-    - ../files/postfix/vmail
     - ../files/postfix/virtual
-# vmail: converts a recipient mail address to a mailbox
-# virtual: specifies certain virtual addresses that need forwarding
-# TODO: Convert vmail to use Postgres lookup
-- name: Rebuild virtual mailbox and alias maps
+- name: Template Postfix "main.cf"
+  template:
+    src: ../templates/postfix/main.cf.j2
+    dest: /etc/postfix/main.cf
+    owner: vmail
+    group: vmail
+    mode: u=rw,g=r,o=r
+- name: Template Postfix PGSQL virtual mapping file
+  template:
+    src: ../templates/postfix/pgsql-vmail.cf.j2
+    dest: /etc/postfix/pgsql-vmail.cf
+    owner: vmail
+    group: vmail
+    mode: u=rw,g=r,o=r
+- name: Rebuild virtual alias maps
   shell: |
-    /usr/sbin/postmap /etc/postfix/vmail
     /usr/sbin/postmap /etc/postfix/virtual
-- name: Rebuild vmail DB
-  shell: /usr/sbin/postmap /etc/postfix/vmail
 - name: Reload Postfix configs
   shell: postfix reload
 - name: Copy "vaulty_server" systemd unit
@@ -68,8 +74,8 @@
   template:
     src: ../templates/vaulty.toml.j2
     dest: /etc/vaulty/vaulty.toml
-    owner: postgres
-    group: postgres
+    owner: vmail
+    group: vmail
     mode: u=rw,g=r,o=r
 - name: Enable and start vaulty service
   systemd:
