@@ -19,14 +19,15 @@ smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
 smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
 
 mydomain = {{ vaulty_domain }}
-alias_maps = hash:/etc/aliases
-alias_database = hash:/etc/aliases
-myorigin = $mydomain
+
+# If this is set to $mydomain, local mail will come from @domain.com
+# For smaller sites, disabling this is preferred
+# myorigin = $mydomain
+
 myhostname = {{ inventory_hostname }}
 mydestination = $myhostname, localhost.$mydomain, localhost.localdomain, localhost
 mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128 172.0.0.0/8 192.168.0.0/16
 relayhost =
-mailbox_command = procmail -a "$EXTENSION"
 mailbox_size_limit = 0
 recipient_delimiter = +
 inet_interfaces = all
