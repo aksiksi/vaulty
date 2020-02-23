@@ -14,15 +14,15 @@ use storage::Backend;
 pub struct EmailHandler<'a> {
     date: String,
     storage_token: &'a str,
-    storage_backend: storage::Backend,
+    storage_backend: &'a storage::Backend,
     storage_path: &'a str,
 }
 
 impl<'a> EmailHandler<'a> {
-    pub fn new(token: &'a str, backend: &'a str, path: &'a str) -> Self {
+    pub fn new(token: &'a str, backend: &'a storage::Backend, path: &'a str) -> Self {
         Self {
             storage_token: token,
-            storage_backend: backend.into(),
+            storage_backend: backend,
             storage_path: path,
 
             // TODO: Figure out user's date from email

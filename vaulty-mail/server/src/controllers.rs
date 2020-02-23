@@ -221,9 +221,11 @@ pub async fn mailgun(content_type: Option<String>, body: String,
     }
 
     let mail: email::Email = mail.into();
+    let storage_backend: vaulty::storage::Backend = "dropbox".into();
+
     let handler = vaulty::EmailHandler::new(
         "test123",
-        "dropbox",
+        &storage_backend,
         "/vaulty",
     );
 

@@ -1,4 +1,7 @@
-#[derive(Debug)]
+/// List of supported storage backends
+/// This enum needs to be kept in sync with the PGSQL enum defined in the
+/// schema
+#[derive(Clone, Debug)]
 pub enum Backend {
     Dropbox,
     Gdrive,
@@ -25,7 +28,14 @@ impl From<&str> for Backend {
             Self::S3
         } else {
             // Default to Dropbox
+            log::error!("Unknown storage backend: {}", s);
             Self::Dropbox
         }
+    }
+}
+
+impl From<String> for Backend {
+    fn from(s: String) -> Self {
+        s.as_str().into()
     }
 }

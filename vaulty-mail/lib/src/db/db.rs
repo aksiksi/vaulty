@@ -3,6 +3,8 @@ use crate::email::Email;
 use chrono::{DateTime, Utc};
 use sqlx::Row;
 
+use crate::storage;
+
 pub enum LogLevel {
     Debug,
     Info,
@@ -31,7 +33,7 @@ pub struct Address {
     pub quota: i32,
     pub received: i32,
     pub storage_token: String,
-    pub storage_backend: String,
+    pub storage_backend: storage::Backend,
     pub storage_path: String,
     pub last_renewal_time: DateTime<Utc>,
 }
@@ -94,7 +96,7 @@ impl <'a> Client<'a> {
             quota: row.get("quota"),
             received: row.get("received"),
             storage_token: row.get("storage_token"),
-            storage_backend: row.get("storage_backend"),
+            storage_backend: row.get::<String, &str>("storage_backend").into(),
             storage_path: row.get("storage_path"),
             last_renewal_time: row.get("last_renewal_time"),
         };
