@@ -1,5 +1,4 @@
-use std::error;
-use std::fmt;
+use crate::storage::Error;
 
 use reqwest::StatusCode;
 
@@ -9,42 +8,24 @@ pub const DROPBOX_ARG_HEADER: &str = "Dropbox-API-Arg";
 pub const DROPBOX_BASE_API: &str = "https://api.dropboxapi.com/2/";
 pub const DROPBOX_BASE_CONTENT: &str = "https://content.dropboxapi.com/2/";
 
-#[derive(Debug)]
-pub enum Error {
-    BadInput,
-    TokenExpired,
-    Endpoint,
-    RateLimited,
-    Internal(u16),
-}
+/// Map possible Dropbox API errors to generic storage backend error
+pub fn map_status(resp: reqwest::Response)
+    -> Result<reqwest::Response, Error> {
+    let err = resp.error_for_status_ref();
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Error::BadInput => f.write_str("BadInput"),
-            Error::TokenExpired => f.write_str("TokenExpired"),
-            Error::Endpoint => f.write_str("Endpoint"),
-            Error::RateLimited => f.write_str("RateLimited"),
-            Error::Internal(_) => f.write_str("Internal Error"),
-        }
-    }
-}
+    if let Err(e) = err {
+        let status = e.status().unwrap();
+        let msg = e.to_string();
 
-impl error::Error for Error {}
-
-impl Error {
-    /// Map possible Dropbox API errors
-    pub fn map_status(resp: reqwest::Response)
-        -> Result<reqwest::Response, Self> {
-        let status = resp.status();
         match status {
-            StatusCode::OK => Ok(resp),
-            StatusCode::BAD_REQUEST => Err(Error::BadInput),
-            StatusCode::FORBIDDEN => Err(Error::TokenExpired),
-            StatusCode::CONFLICT => Err(Error::Endpoint),
-            StatusCode::TOO_MANY_REQUESTS => Err(Error::RateLimited),
-            _ => Err(Error::Internal(status.as_u16())),
+            StatusCode::BAD_REQUEST => Err(Error::BadInput(msg)),
+            StatusCode::FORBIDDEN => Err(Error::TokenExpired(msg)),
+            StatusCode::CONFLICT => Err(Error::BadEndpoint(msg)),
+            StatusCode::TOO_MANY_REQUESTS => Err(Error::RateLimited(msg)),
+            _ => Err(Error::Internal(msg))
         }
+    } else {
+        Ok(resp)
     }
 }
 

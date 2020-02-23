@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use tokio::sync::RwLock;
 use warp::{Rejection, http::Response, reply::Reply};
 
-use vaulty::{email, errors::VaultyError, mailgun, db::{LogLevel}};
+use vaulty::{email, mailgun, db::{LogLevel}};
 
 use super::errors;
 
@@ -232,7 +232,7 @@ pub async fn mailgun(content_type: Option<String>, body: String,
                    .map(|a| a.fetch(api_key.as_ref()))
                    .collect::<FuturesUnordered<_>>()
                    .map_ok(|a| email::Attachment::from(a))
-                   .map_err(|e| VaultyError { msg: e.to_string() })
+                   .map_err(|e| vaulty::Error::GenericError(e.to_string()))
                    .and_then(|a| handler.handle(&mail, Some(a)))
                    .map_err(|_| warp::reject::not_found());
 

@@ -1,8 +1,7 @@
-use std::error;
-
 use reqwest::header::{CONTENT_TYPE};
 
 use super::api;
+use crate::storage::Error;
 
 pub struct Client<'a> {
     token: &'a str,
@@ -19,7 +18,7 @@ impl<'a> Client<'a> {
 
     #[inline]
     async fn request(&self, endpoint: api::Endpoint, body: reqwest::Body,
-                     args: Option<&str>, content_type: Option<&str>) -> Result<bytes::Bytes, Box<dyn error::Error>> {
+                     args: Option<&str>, content_type: Option<&str>) -> Result<bytes::Bytes, Error> {
         let url = api::build_endpoint_url(endpoint);
 
         let mut req = self.client
@@ -32,30 +31,36 @@ impl<'a> Client<'a> {
             req = req.header(api::DROPBOX_ARG_HEADER, v);
         }
 
-        let resp = api::Error::map_status(req.send().await?);
+        // Map response into an error if applicable
+        let resp = api::map_status(req.send().await?);
 
         Ok(resp?.bytes().await?)
     }
 
-    pub async fn list_folder(&self, path: &str) -> Result<api::ListFolderResult, Box<dyn error::Error>> {
+    pub async fn list_folder(&self, path: &str) -> Result<api::ListFolderResult, Error> {
         let body = serde_json::json!({"path": path}).to_string();
         let resp = self.request(api::Endpoint::ListFolder, body.into(), None, None).await?;
         serde_json::from_slice(&resp).map_err(|e| e.into())
     }
 
-    pub async fn create_folder(&self, path: &str) -> Result<api::CreateFolderResult, Box<dyn error::Error>> {
+    /// Create a folder in user's Dropbox
+    /// This function does not return any API metadata
+    pub async fn create_folder(&self, path: &str) -> Result<(), Error> {
         let body = serde_json::json!({"path": path}).to_string();
-        let resp = self.request(api::Endpoint::CreateFolder, body.into(), None, None).await?;
-        serde_json::from_slice(&resp).map_err(|e| e.into())
+        let _resp = self.request(api::Endpoint::CreateFolder, body.into(), None, None).await?;
+        Ok(())
     }
 
-    pub async fn upload(&self, path: &str, data: Vec<u8>, rename: bool) -> Result<api::FileUploadResult, Box<dyn error::Error>> {
-        let args = serde_json::json!({"path": path, "autorename": rename}).to_string();
-        let resp = self.request(api::Endpoint::FileUpload, data.into(), Some(&args), Some("application/octet-stream")).await?;
-        serde_json::from_slice(&resp).map_err(|e| e.into())
+    /// Upload a file to a user's Dropbox
+    /// This function does not return any API metadata
+    pub async fn upload(&self, path: &str, data: Vec<u8>) -> Result<(), Error> {
+        // Auto-rename the attachment if it exists
+        let args = serde_json::json!({"path": path, "autorename": true}).to_string();
+        let _resp = self.request(api::Endpoint::FileUpload, data.into(), Some(&args), Some("application/octet-stream")).await?;
+        Ok(())
     }
 
-    pub async fn search(&self, path: &str, query: &str) -> Result<api::SearchResult, Box<dyn error::Error>> {
+    pub async fn search(&self, path: &str, query: &str) -> Result<api::SearchResult, Error> {
         let data = serde_json::json!({"path": path, "query": query}).to_string();
         let resp = self.request(api::Endpoint::Search, data.into(), None, None).await?;
         serde_json::from_slice(&resp).map_err(|e| e.into())
@@ -96,7 +101,7 @@ mod tests {
         let client = Client::from_token(&token);
         let data = String::from("Hello there!").into_bytes();
 
-        let result = client.upload("/vaulty_test.txt", data, true).await;
+        let result = client.upload("/vaulty_test.txt", data).await;
 
         println!("{:?}", result);
         assert!(result.is_ok());
