@@ -7,6 +7,15 @@
   apt:
     name: rsync
     state: present
+- name: Copy basic SSH config
+  copy:
+    src: ../files/sshd_config
+    dest: /etc/ssh/
+    mode: u=rw,g=r,o=r
+- name: Restart sshd
+  service:
+    name: sshd
+    state: reloaded
 - name: Install fail2ban
   apt:
     name: fail2ban
@@ -15,7 +24,7 @@
   copy:
     src: ../files/jail.local
     dest: /etc/fail2ban/jail.local
-    mode: u=rw,g=rw,o=rw
+    mode: u=rw,g=r,o=r
 - name: Reload fail2ban
   service:
     name: fail2ban

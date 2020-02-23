@@ -1,8 +1,8 @@
 ---
-- name: Set hostname
-  hostname:
-    name: "{{ inventory_hostname }}"
-    use: debian
+# - name: Set hostname
+#   hostname:
+#     name: "{{ inventory_hostname }}"
+#     use: debian
 - name: Install Python 3
   apt:
     name: python3

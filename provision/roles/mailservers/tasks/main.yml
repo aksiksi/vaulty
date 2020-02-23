@@ -18,6 +18,21 @@
     src: ../vaulty-mail/target/release/vaulty_filter
     dest: /usr/bin
     mode: u=rwx,g=rwx,o=rwx
+- name: Install certbot
+  apt:
+    name: certbot
+    state: present
+# Note: Port 80 must not be taken (i.e., vaulty-web must be on another machine)
+- name: Configure and enable certbot
+  command: sudo certbot certonly --standalone -d "{{ inventory_hostname }}" --non-interactive --agree-tos -m "{{ vaulty_postmaster }}"
+  args:
+    creates: "/etc/letsencrypt/live/{{ inventory_hostname }}/fullchain.pem"
+- name: Create crontab to renew certs
+  cron:
+    name: "Renew LetsEncrypt certs"
+    minute: "0"
+    hour: "0"
+    job: "/usr/bin/certbot renew > /dev/null"
 - name: Install Postfix
   apt:
     name: postfix
