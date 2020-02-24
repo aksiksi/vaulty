@@ -75,33 +75,44 @@ impl <'a> Client<'a> {
         Ok(user_id)
     }
 
-    /// Convert a recipient email to address info
-    pub async fn get_address(&mut self, recipient: &str)
-        -> Result<Address, Box<dyn std::error::Error>> {
-        let query = format!("
-            SELECT * FROM {} WHERE address = $1", &self.address_table
-        );
+    /// Convert a list of recipient emails into address info.
+    ///
+    /// This function will only return info for the **first** valid recipient
+    /// email in the provided list.
+    pub async fn get_address(&mut self, recipients: &Vec<&str>)
+        -> Result<Option<Address>, Box<dyn std::error::Error>> {
+        // Build a SQL list of values to check against
+        // NOTE: This may need to be sanitizied
+        let address_list = recipients.iter()
+                                     .map(|r| format!("'{}'", r))
+                                     .collect::<Vec<String>>()
+                                     .join(", ");
+
+        let query = format!("SELECT * FROM {} WHERE address IN ({})",
+                            &self.address_table, &address_list);
 
         let row = sqlx::query(&query)
-                       .bind(recipient)
                        .fetch_optional(self.db)
                        .await?;
 
-        let row = row.unwrap();
+        if let Some(data) = row {
+            let address = Address {
+                address: data.get("address"),
+                user_id: data.get("user_id"),
+                max_email_size: data.get("max_email_size"),
+                quota: data.get("quota"),
+                received: data.get("received"),
+                storage_token: data.get("storage_token"),
+                storage_backend: data.get::<String, &str>("storage_backend").into(),
+                storage_path: data.get("storage_path"),
+                last_renewal_time: data.get("last_renewal_time"),
+            };
 
-        let address = Address {
-            address: recipient.to_string(),
-            user_id: row.get("user_id"),
-            max_email_size: row.get("max_email_size"),
-            quota: row.get("quota"),
-            received: row.get("received"),
-            storage_token: row.get("storage_token"),
-            storage_backend: row.get::<String, &str>("storage_backend").into(),
-            storage_path: row.get("storage_path"),
-            last_renewal_time: row.get("last_renewal_time"),
-        };
-
-        Ok(address)
+            Ok(Some(address))
+        } else {
+            // If no rows returned, none of the recipients are valid
+            Ok(None)
+        }
     }
 
     /// Update address mail received count
@@ -123,8 +134,12 @@ impl <'a> Client<'a> {
     }
 
     /// Log a message to the logs table
+    ///
     /// If this fails, we just log an error internally and proceed.
-    pub async fn log(&mut self, email_id: &uuid::Uuid, msg: &str, log_level: LogLevel) {
+    ///
+    /// `email_id` is optional since we may insert logs before inserting an
+    /// email (e.g., rejected email).
+    pub async fn log(&mut self, msg: &str, email_id: Option<&uuid::Uuid>, log_level: LogLevel) {
         let query = format!("
             INSERT INTO {0}
             (email_id, msg, log_level) VALUES
@@ -150,19 +165,16 @@ impl <'a> Client<'a> {
         let email_id = &email.uuid;
         let num_attachments = email.num_attachments.unwrap_or(0);
 
-        // Recipient list should have been filtered down at this point
+        // Recipient list will have been filtered down at this point
         let recipient = &email.recipients[0];
 
-        // TODO
-        // let total_size = email.size;
         let total_size = email.size;
-
         let creation_time: DateTime<Utc> = Utc::now();
 
         let query = format!("
-            INSERT INTO {0} (user_id, address_id, email_id, num_attachments, total_size, creation_time) VALUES
+            INSERT INTO {0} (user_id, address_id, email_id, num_attachments, total_size, message_id, creation_time) VALUES
             ((SELECT user_id FROM {1} WHERE address = $1),
-             (SELECT id FROM {1} WHERE address = $1), $2, $3, $4, $5)",
+             (SELECT id FROM {1} WHERE address = $1), $2, $3, $4, $5, $6)",
             &self.email_table, &self.address_table
         );
 
@@ -171,6 +183,7 @@ impl <'a> Client<'a> {
                              .bind(email_id)
                              .bind(num_attachments as i32)
                              .bind(total_size as i32)
+                             .bind(email.message_id.as_ref())
                              .bind(creation_time)
                              .execute(self.db)
                              .await?;
@@ -179,6 +192,7 @@ impl <'a> Client<'a> {
     }
 
     /// Update email status (success or failure)
+    /// We do not really care if this operation fails (best-effort)
     pub async fn update_email(&mut self, email: &Email, status: bool,
                               msg: Option<&str>) {
         let email_id = &email.uuid;

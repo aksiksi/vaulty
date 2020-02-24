@@ -8,9 +8,11 @@ use tokio::process::Command;
 
 use futures::stream::{FuturesUnordered, StreamExt};
 
-use structopt::StructOpt;
-
 use lazy_static::lazy_static;
+
+use reqwest::StatusCode;
+
+use structopt::StructOpt;
 
 // TODO: Can we make this more flexible?
 lazy_static! {
@@ -94,15 +96,22 @@ async fn process(remote_addr: &str, mail: vaulty::email::Email, raw_mail: &[u8],
         .body(reqwest::Body::from(email));
 
     let resp = req.send().await?;
-    let status = resp.status().is_success();
+    let status = resp.status();
+    let is_success = status.is_success();
 
-    let bytes = &resp.bytes().await?;
-    let resp_str = std::str::from_utf8(bytes)?;
+    let body = &resp.text().await?;
 
-    if !status {
-        log::error!("Failed to process email {} with: \"{}\"",
-                    mail.uuid, resp_str);
-        return Err("Failed to process email".into());
+    if !is_success {
+        if status == StatusCode::UNPROCESSABLE_ENTITY {
+            // None of the listed recipients are valid
+            // Reject the email gracefully
+            log::info!("{}", body);
+            return Ok(());
+        } else {
+            log::error!("Failed to process email {} with: \"{}\"",
+                        mail.uuid, body);
+            return Err("Failed to process email".into());
+        }
     }
 
     if let Some(attachments) = &mail.attachments {

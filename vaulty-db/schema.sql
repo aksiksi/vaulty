@@ -39,6 +39,7 @@ CREATE TABLE emails (
     user_id INTEGER REFERENCES users ON DELETE CASCADE,
     address_id INTEGER REFERENCES addresses ON DELETE CASCADE,
     email_id UUID NOT NULL,
+    message_id TEXT, -- Standard MIME Message-ID
     num_attachments INTEGER NOT NULL,
     total_size INTEGER NOT NULL,
     status BOOLEAN DEFAULT true, -- Email processed successfully by default
@@ -51,6 +52,7 @@ CREATE TABLE emails (
 -- Logs used for debugging issues
 CREATE TABLE logs (
     id SERIAL PRIMARY KEY,
+    -- NOTE: email_id can be NULL (e.g., log w/o inserting an email)
     email_id UUID REFERENCES emails(email_id) ON DELETE CASCADE,
     msg TEXT NOT NULL,
     log_level INTEGER NOT NULL,

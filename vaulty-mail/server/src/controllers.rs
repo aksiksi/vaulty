@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
 use lazy_static::lazy_static;
 use tokio::sync::RwLock;
-use warp::{Rejection, http::Response, reply::Reply};
+use warp::{Rejection, http::{self, Response}, reply::Reply};
 
 use vaulty::{email, mailgun, db::{LogLevel}};
 
@@ -24,16 +24,14 @@ lazy_static! {
 pub mod postfix {
     use super::*;
 
-    pub async fn email(email: email::Email, mut db: sqlx::PgPool)
+    pub async fn email(mut email: email::Email, mut db: sqlx::PgPool)
         -> Result<impl Reply, Rejection> {
          let mut db_client = vaulty::db::Client::new(&mut db);
 
-         let recipient = &email.recipients[0];
-         log::info!("Got email for recipient {}", recipient);
-
          // Get address information for the relevant recipient address
          // Use this to verify that user still has enough quota remaining
-         let address = match db_client.get_address(recipient).await {
+         let recipients = &email.recipients.iter().map(|r| r.as_str()).collect();
+         let address = match db_client.get_address(recipients).await {
              Ok(a) => a,
              Err(e) => {
                  let msg = e.to_string();
@@ -43,6 +41,47 @@ pub mod postfix {
                  return Err(warp::reject::custom(err));
              },
          };
+
+         // If none of the recipients are valid, reject this email gracefully
+         // with a unique status code.
+         let address = match address {
+             None => {
+                 // We do not use internal UUID here b/c there really is no
+                 // history maintained for this email.  Using Message-ID will
+                 // at least help with user queries as to why their email
+                 // never arrived.
+                 let msg = format!("Rejecting email message_id: {}, \
+                                    from: {}, to: {}",
+                                   &email.message_id.unwrap_or("N/A".to_string()),
+                                   &email.sender,
+                                   &email.recipients.join(", "));
+
+                 log::info!("{}", msg);
+                 db_client.log(&msg, None, LogLevel::Info).await;
+
+                 let status = http::status::StatusCode::UNPROCESSABLE_ENTITY;
+                 let resp = Response::builder()
+                                     .status(status)
+                                     .body(msg);
+
+                 return Ok(resp.unwrap());
+             },
+             Some(a) => a,
+         };
+
+         // Update the email to just have the valid recipient address
+         // found above
+         let recipient = &address.address;
+         email.recipients.retain(|r| r == recipient);
+
+         // Insert this email into DB
+         if let Err(e) = db_client.insert_email(&email).await {
+             let msg = e.to_string();
+             log::error!("{}", msg);
+             let err = errors::VaultyServerError { msg: msg };
+
+             return Err(warp::reject::custom(err));
+         }
 
          // Increment received email count at the start
          // If this fails, do not proceed with processing this email
@@ -54,17 +93,10 @@ pub mod postfix {
              return Err(warp::reject::custom(err));
          }
 
-         // Insert this email into DB
-         if let Err(e) = db_client.insert_email(&email).await {
-             let msg = e.to_string();
-             log::error!("{}", msg);
-             let err = errors::VaultyServerError { msg: msg };
-
-             return Err(warp::reject::custom(err));
-         }
-
          let msg = format!("Got email for recipient {}", recipient);
-         db_client.log(&email.uuid, &msg, LogLevel::Info).await;
+
+         log::info!("{}", msg);
+         db_client.log(&msg, Some(&email.uuid), LogLevel::Info).await;
 
          let uuid = email.uuid.to_string();
          let resp = Response::builder();
@@ -122,7 +154,7 @@ pub mod postfix {
 
          let recipient = &email.recipients[0];
          let msg = format!("Got attachment for recipient {}", recipient);
-         db_client.log(&email.uuid, &msg, LogLevel::Info).await;
+         db_client.log(&msg, Some(&email.uuid), LogLevel::Info).await;
 
          // If this is the last attachment for this email, cleanup the cache
          // entry. Get this done early to minimize the chance of leaking an entry.
