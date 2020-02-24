@@ -70,7 +70,7 @@ INSERT INTO addresses
     (address, is_active, user_id, max_email_size, quota, last_renewal_time, creation_time, storage_backend, storage_token, storage_path, whitelist, is_whitelist_enabled) VALUES
     ('info@vaulty.net', TRUE, (SELECT id FROM users WHERE email='abc@abc.com'), 20000000,
      5000, '2020-02-09 19:38:12-05:00','2020-02-09 19:38:12-05:00', 'dropbox', '{{ vaulty_dropbox_token }}', '/vaulty', '{"cyph0nik@gmail.com"}', true),
-    ('admin@vaulty.net', TRUE, (SELECT id FROM users WHERE email='def@abc.com'), 20000000, 5000, '2020-02-09 19:38:12-05:00','2020-02-09 19:38:12-05:00', 'gdrive', 'testabc', '/vaulty/');
+    ('admin@vaulty.net', TRUE, (SELECT id FROM users WHERE email='def@abc.com'), 20000000, 5000, '2020-02-09 19:38:12-05:00','2020-02-09 19:38:12-05:00', 'gdrive', 'testabc', '/vaulty/', NULL, false);
 
 INSERT INTO emails (user_id, address_id, email_id, num_attachments,
                       total_size, status, error_msg, creation_time) VALUES
