@@ -173,11 +173,11 @@ impl<'a> Client<'a> {
                 sender,
                 recipient
             );
-            log::info!("{}", msg);
+            log::warn!("{}", msg);
 
             // Do not log this against email as email might not have
             // been inserted
-            self.log(&msg, None, LogLevel::Info).await;
+            self.log(&msg, None, LogLevel::Warning).await;
 
             Ok(false)
         } else {

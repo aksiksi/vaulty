@@ -65,8 +65,8 @@ pub mod postfix {
                     &email.recipients.join(", ")
                 );
 
-                log::info!("{}", msg);
-                db_client.log(&msg, None, LogLevel::Info).await;
+                log::warn!("{}", msg);
+                db_client.log(&msg, None, LogLevel::Warning).await;
 
                 let status = http::status::StatusCode::UNPROCESSABLE_ENTITY;
                 let resp = Response::builder().status(status).body(msg);
@@ -110,6 +110,35 @@ pub mod postfix {
             let err = errors::VaultyServerError { msg: msg };
 
             return Err(warp::reject::custom(err));
+        }
+
+        // Verify that address quota is not exceeded with this email
+        let max_email_size = address.max_email_size as usize;
+        let is_mail_size_exceeded = email.size > max_email_size;
+        let is_quota_exceeded = (address.received + 1) > address.quota;
+        let reject = is_quota_exceeded || is_mail_size_exceeded;
+
+        if reject {
+            let msg = if is_mail_size_exceeded {
+                format!(
+                    "Email {} is larger than allowed for this address: {}",
+                    &email.uuid, recipient
+                )
+            } else {
+                format!("Address {} has hit its quota for this period", recipient)
+            };
+
+            log::warn!("{}", msg);
+
+            db_client
+                .log(&msg, Some(&email.uuid), LogLevel::Warning)
+                .await;
+
+            db_client.update_email(&email, false, Some(&msg)).await;
+
+            let status = http::status::StatusCode::UNPROCESSABLE_ENTITY;
+            let resp = Response::builder().status(status).body(msg);
+            return Ok(resp.unwrap());
         }
 
         // Increment received email count at the start
