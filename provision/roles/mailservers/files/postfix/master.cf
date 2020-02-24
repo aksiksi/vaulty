@@ -132,4 +132,4 @@ mailman   unix  -       n       n       -       -       pipe
 # Details here: http://www.postfix.org/pipe.8.html
 vaulty_filter    unix  -       n       n       -       30      pipe
     flags=XRq user=vmail null_sender=
-    argv=/usr/bin/vaulty_filter -r ${recipient} -s ${sender} -o ${original_recipient}
+    argv=/usr/bin/vaulty_filter -r ${recipient} -s ${sender}

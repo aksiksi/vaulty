@@ -1,10 +1,5 @@
 use std::env;
 use std::io::Read;
-use std::process::Stdio;
-
-// AsyncRead trait for tokio::io::stdin
-use tokio::prelude::*;
-use tokio::process::Command;
 
 use futures::stream::{FuturesUnordered, StreamExt};
 
@@ -22,12 +17,6 @@ lazy_static! {
                                          .expect("No auth username found!");
 }
 
-const VALID_RECIPIENTS: &[&str] = &[
-    "postmaster@vaulty.net",
-    "admin@vaulty.net",
-    "support@vaulty.net",
-];
-
 #[derive(Debug, StructOpt)]
 #[structopt(name = "vaulty-filter", about = "Vaulty filter for Postfix incoming mail.")]
 struct Opt {
@@ -36,9 +25,6 @@ struct Opt {
 
     #[structopt(short, long)]
     recipients: Vec<String>,
-
-    #[structopt(short, long)]
-    original_recipients: Vec<String>,
 }
 
 async fn send_attachment(remote_addr: &str, client: &reqwest::Client,
@@ -65,28 +51,8 @@ async fn send_attachment(remote_addr: &str, client: &reqwest::Client,
 }
 
 /// Transmit this email to the Vaulty processing server
-async fn process(remote_addr: &str, mail: vaulty::email::Email, raw_mail: &[u8],
-                 original_recipients: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
-    // Any mail destined for "postmaster" (or equivalent) must be injected
-    // back into Postfix. The recipient would have already been remapped using
-    // the virtual alias mapping, which is why we check the orig. recipient list.
-    for r in original_recipients.iter() {
-        if VALID_RECIPIENTS.iter().any(|e| e == r) {
-            let mut child =
-                Command::new("/usr/sbin/sendmail")
-                        .args(&["-G", "-i", "-f", &mail.sender, &mail.recipients.join(" ")])
-                        .stdin(Stdio::piped())
-                        .spawn()?;
-
-            {
-                let stdin = child.stdin.as_mut().expect("Failed to open stdin");
-                stdin.write_all(raw_mail).await.expect("Failed to write to stdin");
-            }
-
-            return Ok(());
-        }
-    }
-
+async fn process(remote_addr: &str, mail: vaulty::email::Email)
+    -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
     let email = serde_json::to_string(&mail)?;
 
@@ -151,7 +117,5 @@ async fn main() {
                                     .with_sender(opt.sender)
                                     .with_recipients(opt.recipients);
 
-    process(&remote_addr, mail, email_content.as_bytes(), opt.original_recipients)
-        .await
-        .unwrap();
+    process(&remote_addr, mail).await.unwrap();
 }

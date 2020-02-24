@@ -1,2 +1,4 @@
-# Forward all postmaster mail to personal account
+# Forward admin-related mail to "vmail" user
 postmaster@vaulty.net vmail
+admin@vaulty.net      vmail
+support@vaulty.net    vmail
