@@ -49,6 +49,8 @@ pub mod postfix {
 
         // If none of the recipients are valid, reject this email gracefully
         // with a unique status code.
+        // NOTE: This case should never be hit as Postfix is looking at the
+        // same DB.
         let address = match address {
             None => {
                 // We do not use internal UUID here b/c there really is no
@@ -74,6 +76,28 @@ pub mod postfix {
             Some(a) => a,
         };
 
+        // Ensure that sender address is whitelisted
+        // We scope this to avoid compiler nags about dyn Error
+        {
+            let valid = db_client.validate_sender_address(&address, &email).await;
+
+            if let Err(e) = valid {
+                let msg = e.to_string();
+                log::error!("{}", msg);
+                let err = errors::VaultyServerError { msg: msg };
+                return Err(warp::reject::custom(err));
+            }
+
+            if !valid.unwrap() {
+                // Sender is not on the whitelist
+                // Fail gracefully...
+                let msg = "Rejecting email due to non-whitelisted sender".to_string();
+                let status = http::status::StatusCode::UNPROCESSABLE_ENTITY;
+                let resp = Response::builder().status(status).body(msg);
+                return Ok(resp.unwrap());
+            }
+        }
+
         // Update the email to just have the valid recipient address
         // found above
         let recipient = &address.address;
@@ -90,6 +114,7 @@ pub mod postfix {
 
         // Increment received email count at the start
         // If this fails, do not proceed with processing this email
+        // TODO: Can we do this in a single transaction (merge with above)?
         if let Err(e) = db_client.update_address_received_count(&address).await {
             let msg = e.to_string();
             log::error!("{}", msg);
@@ -143,9 +168,17 @@ pub mod postfix {
         let resp = Response::builder();
         let mut db_client = vaulty::db::Client::new(&mut db);
 
-        // TODO: No unwrap!
+        // TODO: Perhaps make this raw instead of MessagePack
         let attachment: vaulty::email::Attachment =
-            rmp_serde::decode::from_read(body.as_ref()).unwrap();
+            match rmp_serde::decode::from_read(body.as_ref()) {
+                Err(e) => {
+                    let msg = e.to_string();
+                    log::error!("{}", msg);
+                    let err = errors::VaultyServerError { msg: msg };
+                    return Err(warp::reject::custom(err));
+                }
+                Ok(v) => v,
+            };
 
         let uuid = attachment.get_email_id().to_string();
 

@@ -143,6 +143,48 @@ impl<'a> Client<'a> {
         Ok(())
     }
 
+    /// Validates sender address by checking that it is in the list of
+    /// whitelisted senders for this recipient.
+    pub async fn validate_sender_address(
+        &mut self,
+        address: &Address,
+        email: &Email,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
+        let sender = &email.sender;
+        let recipient = &address.address;
+
+        let query = format!(
+            "SELECT is_active FROM {} WHERE ($1 = ANY (whitelist) OR is_whitelist_enabled = false)
+            AND address = $2",
+            &self.address_table
+        );
+
+        let row = sqlx::query(&query)
+            .bind(sender)
+            .bind(recipient)
+            .fetch_optional(self.db)
+            .await?;
+
+        if let None = row {
+            let msg = format!(
+                "Rejecting email {} (Message-ID: {}): sender {} is not on {} whitelist",
+                &email.uuid,
+                &email.message_id.as_ref().unwrap_or(&"N/A".to_string()),
+                sender,
+                recipient
+            );
+            log::info!("{}", msg);
+
+            // Do not log this against email as email might not have
+            // been inserted
+            self.log(&msg, None, LogLevel::Info).await;
+
+            Ok(false)
+        } else {
+            Ok(true)
+        }
+    }
+
     /// Log a message to the logs table
     ///
     /// If this fails, we just log an error internally and proceed.

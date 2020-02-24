@@ -28,6 +28,8 @@ CREATE TABLE addresses (
     storage_backend storage_backend NOT NULL,
     storage_token TEXT NOT NULL, -- Token for whichever provider is used
     storage_path TEXT NOT NULL, -- Path to store data (in valid backend format)
+    is_whitelist_enabled BOOLEAN DEFAULT false,
+    whitelist TEXT[], -- Sender whitelist
     last_update_time TIMESTAMPTZ DEFAULT current_timestamp,
     creation_time TIMESTAMPTZ NOT NULL,
     UNIQUE(address, is_active)
@@ -65,9 +67,9 @@ INSERT INTO users (email, password, is_subscribed, creation_time) VALUES
     ('def@abc.com', 'test123', TRUE, '2020-02-09 19:38:12-05:00');
 
 INSERT INTO addresses
-    (address, is_active, user_id, max_email_size, quota, last_renewal_time, creation_time, storage_backend, storage_token, storage_path) VALUES
+    (address, is_active, user_id, max_email_size, quota, last_renewal_time, creation_time, storage_backend, storage_token, storage_path, whitelist, is_whitelist_enabled) VALUES
     ('info@vaulty.net', TRUE, (SELECT id FROM users WHERE email='abc@abc.com'), 20000000,
-     5000, '2020-02-09 19:38:12-05:00','2020-02-09 19:38:12-05:00', 'dropbox', '{{ vaulty_dropbox_token }}', '/vaulty'),
+     5000, '2020-02-09 19:38:12-05:00','2020-02-09 19:38:12-05:00', 'dropbox', '{{ vaulty_dropbox_token }}', '/vaulty', '{"cyph0nik@gmail.com"}', true),
     ('admin@vaulty.net', TRUE, (SELECT id FROM users WHERE email='def@abc.com'), 20000000, 5000, '2020-02-09 19:38:12-05:00','2020-02-09 19:38:12-05:00', 'gdrive', 'testabc', '/vaulty/');
 
 INSERT INTO emails (user_id, address_id, email_id, num_attachments,
