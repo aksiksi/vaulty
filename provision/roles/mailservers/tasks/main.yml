@@ -33,6 +33,11 @@
     minute: "0"
     hour: "0"
     job: "/usr/bin/certbot renew > /dev/null"
+- name: Add certbot hook to reload Postfix on cert renewal
+  lineinfile:
+    path: "/etc/letsencrypt/renewal/{{ inventory_hostname }}.conf"
+    line: "renew_hook = sudo systemctl reload postfix"
+    state: present
 - name: Install Postfix
   apt:
     name: postfix
