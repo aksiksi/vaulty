@@ -47,7 +47,7 @@ pub struct Client<'a> {
     pub log_table: String,
 }
 
-impl <'a> Client<'a> {
+impl<'a> Client<'a> {
     pub fn new(db: &'a mut sqlx::PgPool) -> Self {
         Client {
             db: db,
@@ -59,16 +59,19 @@ impl <'a> Client<'a> {
     }
 
     /// Convert a recipient email to a user ID
-    pub async fn get_user_id(&mut self, recipient: &str)
-        -> Result<i32, Box<dyn std::error::Error>> {
-        let query =
-            format!("SELECT user_id FROM {} WHERE address = $1",
-                    &self.address_table);
+    pub async fn get_user_id(
+        &mut self,
+        recipient: &str,
+    ) -> Result<i32, Box<dyn std::error::Error>> {
+        let query = format!(
+            "SELECT user_id FROM {} WHERE address = $1",
+            &self.address_table
+        );
 
         let row = sqlx::query(&query)
-                       .bind(recipient)
-                       .fetch_one(self.db)
-                       .await?;
+            .bind(recipient)
+            .fetch_one(self.db)
+            .await?;
 
         let user_id: i32 = row.get("user_id");
 
@@ -79,21 +82,24 @@ impl <'a> Client<'a> {
     ///
     /// This function will only return info for the **first** valid recipient
     /// email in the provided list.
-    pub async fn get_address(&mut self, recipients: &Vec<&str>)
-        -> Result<Option<Address>, Box<dyn std::error::Error>> {
+    pub async fn get_address(
+        &mut self,
+        recipients: &Vec<&str>,
+    ) -> Result<Option<Address>, Box<dyn std::error::Error>> {
         // Build a SQL list of values to check against
         // NOTE: This may need to be sanitizied
-        let address_list = recipients.iter()
-                                     .map(|r| format!("'{}'", r))
-                                     .collect::<Vec<String>>()
-                                     .join(", ");
+        let address_list = recipients
+            .iter()
+            .map(|r| format!("'{}'", r))
+            .collect::<Vec<String>>()
+            .join(", ");
 
-        let query = format!("SELECT * FROM {} WHERE address IN ({})",
-                            &self.address_table, &address_list);
+        let query = format!(
+            "SELECT * FROM {} WHERE address IN ({})",
+            &self.address_table, &address_list
+        );
 
-        let row = sqlx::query(&query)
-                       .fetch_optional(self.db)
-                       .await?;
+        let row = sqlx::query(&query).fetch_optional(self.db).await?;
 
         if let Some(data) = row {
             let address = Address {
@@ -116,19 +122,23 @@ impl <'a> Client<'a> {
     }
 
     /// Update address mail received count
-    pub async fn update_address_received_count(&mut self, address: &Address)
-        -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn update_address_received_count(
+        &mut self,
+        address: &Address,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // For now, just increment the received count
-        let query = format!("
+        let query = format!(
+            "
             UPDATE {}
             SET received = received + 1
-            WHERE address = $1", &self.address_table
+            WHERE address = $1",
+            &self.address_table
         );
 
         let _num_rows = sqlx::query(&query)
-                             .bind(&address.address)
-                             .execute(self.db)
-                             .await?;
+            .bind(&address.address)
+            .execute(self.db)
+            .await?;
 
         Ok(())
     }
@@ -140,18 +150,20 @@ impl <'a> Client<'a> {
     /// `email_id` is optional since we may insert logs before inserting an
     /// email (e.g., rejected email).
     pub async fn log(&mut self, msg: &str, email_id: Option<&uuid::Uuid>, log_level: LogLevel) {
-        let query = format!("
+        let query = format!(
+            "
             INSERT INTO {0}
             (email_id, msg, log_level) VALUES
-            ($1, $2, $3)", &self.log_table
+            ($1, $2, $3)",
+            &self.log_table
         );
 
         let num_rows = sqlx::query(&query)
-                            .bind(email_id)
-                            .bind(msg)
-                            .bind(log_level as i32)
-                            .execute(self.db)
-                            .await;
+            .bind(email_id)
+            .bind(msg)
+            .bind(log_level as i32)
+            .execute(self.db)
+            .await;
 
         if let Err(e) = num_rows {
             log::error!("Failed to log to DB: {}", e.to_string());
@@ -160,8 +172,7 @@ impl <'a> Client<'a> {
 
     /// Insert an email into DB
     /// Status and error message must be updated later
-    pub async fn insert_email(&mut self, email: &Email)
-        -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn insert_email(&mut self, email: &Email) -> Result<(), Box<dyn std::error::Error>> {
         let email_id = &email.uuid;
         let num_attachments = email.num_attachments.unwrap_or(0);
 
@@ -179,36 +190,37 @@ impl <'a> Client<'a> {
         );
 
         let _num_rows = sqlx::query(&query)
-                             .bind(recipient)
-                             .bind(email_id)
-                             .bind(num_attachments as i32)
-                             .bind(total_size as i32)
-                             .bind(email.message_id.as_ref())
-                             .bind(creation_time)
-                             .execute(self.db)
-                             .await?;
+            .bind(recipient)
+            .bind(email_id)
+            .bind(num_attachments as i32)
+            .bind(total_size as i32)
+            .bind(email.message_id.as_ref())
+            .bind(creation_time)
+            .execute(self.db)
+            .await?;
 
         Ok(())
     }
 
     /// Update email status (success or failure)
     /// We do not really care if this operation fails (best-effort)
-    pub async fn update_email(&mut self, email: &Email, status: bool,
-                              msg: Option<&str>) {
+    pub async fn update_email(&mut self, email: &Email, status: bool, msg: Option<&str>) {
         let email_id = &email.uuid;
 
-        let query = format!("
+        let query = format!(
+            "
             UPDATE {}
             SET status = $1, error_msg = $2
-            WHERE email_id = $3", &self.email_table
+            WHERE email_id = $3",
+            &self.email_table
         );
 
         let num_rows = sqlx::query(&query)
-                            .bind(status)
-                            .bind(msg)
-                            .bind(email_id)
-                            .execute(self.db)
-                            .await;
+            .bind(status)
+            .bind(msg)
+            .bind(email_id)
+            .execute(self.db)
+            .await;
 
         if let Err(e) = num_rows {
             log::error!("Failed to update email: {}", e.to_string());

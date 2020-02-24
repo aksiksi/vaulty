@@ -13,8 +13,10 @@ pub fn load_config(path: Option<&str>) -> HashMap<String, String> {
     let mut settings = config::Config::default();
 
     settings
-        .merge(config::File::with_name(path.unwrap_or(DEFAULT_PATH))).unwrap()
-        .merge(config::Environment::with_prefix(ENV_PREFIX)).unwrap();
+        .merge(config::File::with_name(path.unwrap_or(DEFAULT_PATH)))
+        .unwrap()
+        .merge(config::Environment::with_prefix(ENV_PREFIX))
+        .unwrap();
 
     settings.try_into::<HashMap<String, String>>().unwrap()
 }

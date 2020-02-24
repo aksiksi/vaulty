@@ -9,8 +9,7 @@ pub const DROPBOX_BASE_API: &str = "https://api.dropboxapi.com/2/";
 pub const DROPBOX_BASE_CONTENT: &str = "https://content.dropboxapi.com/2/";
 
 /// Map possible Dropbox API errors to generic storage backend error
-pub fn map_status(resp: reqwest::Response)
-    -> Result<reqwest::Response, Error> {
+pub fn map_status(resp: reqwest::Response) -> Result<reqwest::Response, Error> {
     let err = resp.error_for_status_ref();
 
     if let Err(e) = err {
@@ -22,7 +21,7 @@ pub fn map_status(resp: reqwest::Response)
             StatusCode::FORBIDDEN => Err(Error::TokenExpired(msg)),
             StatusCode::CONFLICT => Err(Error::BadEndpoint(msg)),
             StatusCode::TOO_MANY_REQUESTS => Err(Error::RateLimited(msg)),
-            _ => Err(Error::Internal(msg))
+            _ => Err(Error::Internal(msg)),
         }
     } else {
         Ok(resp)

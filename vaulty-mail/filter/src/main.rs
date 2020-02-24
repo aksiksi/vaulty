@@ -11,14 +11,15 @@ use structopt::StructOpt;
 
 // TODO: Can we make this more flexible?
 lazy_static! {
-    static ref VAULTY_USER: String = env::var("VAULTY_USER")
-                                         .expect("No auth username found!");
-    static ref VAULTY_PASS: String = env::var("VAULTY_PASS")
-                                         .expect("No auth username found!");
+    static ref VAULTY_USER: String = env::var("VAULTY_USER").expect("No auth username found!");
+    static ref VAULTY_PASS: String = env::var("VAULTY_PASS").expect("No auth username found!");
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "vaulty-filter", about = "Vaulty filter for Postfix incoming mail.")]
+#[structopt(
+    name = "vaulty-filter",
+    about = "Vaulty filter for Postfix incoming mail."
+)]
 struct Opt {
     #[structopt(short, long)]
     sender: String,
@@ -27,11 +28,15 @@ struct Opt {
     recipients: Vec<String>,
 }
 
-async fn send_attachment(remote_addr: &str, client: &reqwest::Client,
-                         attachment: &vaulty::email::Attachment)
-    -> Result<(), Box<dyn std::error::Error>> {
-    log::info!("Processing attachment for email: {}",
-               attachment.get_email_id().to_string());
+async fn send_attachment(
+    remote_addr: &str,
+    client: &reqwest::Client,
+    attachment: &vaulty::email::Attachment,
+) -> Result<(), Box<dyn std::error::Error>> {
+    log::info!(
+        "Processing attachment for email: {}",
+        attachment.get_email_id().to_string()
+    );
 
     let raw = rmp_serde::encode::to_vec_named(&attachment)?;
 
@@ -51,8 +56,10 @@ async fn send_attachment(remote_addr: &str, client: &reqwest::Client,
 }
 
 /// Transmit this email to the Vaulty processing server
-async fn process(remote_addr: &str, mail: vaulty::email::Email)
-    -> Result<(), Box<dyn std::error::Error>> {
+async fn process(
+    remote_addr: &str,
+    mail: vaulty::email::Email,
+) -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
     let email = serde_json::to_string(&mail)?;
 
@@ -74,8 +81,7 @@ async fn process(remote_addr: &str, mail: vaulty::email::Email)
             log::info!("{}", body);
             return Ok(());
         } else {
-            log::error!("Failed to process email {} with: \"{}\"",
-                        mail.uuid, body);
+            log::error!("Failed to process email {} with: \"{}\"", mail.uuid, body);
             return Err("Failed to process email".into());
         }
     }
@@ -84,11 +90,12 @@ async fn process(remote_addr: &str, mail: vaulty::email::Email)
         // 1. Create an iterator of `Future<Result<_, _>>`
         // 2. Collect the futures in a `FuturesUnordered`
         // 3. Collect the results into a `Vec`
-        attachments.iter()
-                   .map(|a| send_attachment(&remote_addr, &client, a))
-                   .collect::<FuturesUnordered<_>>()
-                   .collect::<Vec<_>>()
-                   .await;
+        attachments
+            .iter()
+            .map(|a| send_attachment(&remote_addr, &client, a))
+            .collect::<FuturesUnordered<_>>()
+            .collect::<Vec<_>>()
+            .await;
     }
 
     Ok(())
@@ -108,14 +115,15 @@ async fn main() {
 
     // Get message body from stdin
     let mut email_content = String::new();
-    std::io::stdin().read_to_string(&mut email_content)
-                    .expect("Failed to read email body from stdin!");
+    std::io::stdin()
+        .read_to_string(&mut email_content)
+        .expect("Failed to read email body from stdin!");
 
     // Parse and process email
     let mail = vaulty::email::Email::from_mime(email_content.as_bytes())
-                                    .unwrap()
-                                    .with_sender(opt.sender)
-                                    .with_recipients(opt.recipients);
+        .unwrap()
+        .with_sender(opt.sender)
+        .with_recipients(opt.recipients);
 
     process(&remote_addr, mail).await.unwrap();
 }

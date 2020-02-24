@@ -2,9 +2,9 @@ use chrono::offset::Utc;
 
 pub mod config;
 pub mod db;
-pub mod storage;
 pub mod email;
 pub mod mailgun;
+pub mod storage;
 
 mod errors;
 pub use errors::Error;
@@ -31,11 +31,16 @@ impl<'a> EmailHandler<'a> {
         }
     }
 
-    pub async fn handle(&self, email: &email::Email,
-                        attachment: Option<email::Attachment>)
-        -> Result<(), Error> {
-        log::info!("Handling mail for {} on {}",
-                   email.recipients[0], self.storage_backend);
+    pub async fn handle(
+        &self,
+        email: &email::Email,
+        attachment: Option<email::Attachment>,
+    ) -> Result<(), Error> {
+        log::info!(
+            "Handling mail for {} on {}",
+            email.recipients[0],
+            self.storage_backend
+        );
         log::info!("Date in UTC: {}", self.date);
 
         // 1. Figure out if user is valid and active
@@ -64,11 +69,11 @@ impl<'a> EmailHandler<'a> {
                     let result = client.upload(&file_path, attachment.data).await;
 
                     result.map_err(|e| e.into())
-                },
+                }
                 Backend::Gdrive => {
                     // TODO
                     Ok(())
-                },
+                }
                 Backend::S3 => {
                     // TODO
                     Ok(())
@@ -82,5 +87,4 @@ impl<'a> EmailHandler<'a> {
 }
 
 #[cfg(test)]
-mod tests {
-}
+mod tests {}

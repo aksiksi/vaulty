@@ -87,8 +87,9 @@ impl From<Email> for crate::email::Email {
 impl Attachment {
     /// Create a Vec of attachments from a Mailgun form response
     pub fn from_form(body: &str) -> Result<Vec<Attachment>, Box<dyn std::error::Error>> {
-        let parsed: HashMap<String, String> =
-            url::form_urlencoded::parse(body.as_bytes()).into_owned().collect();
+        let parsed: HashMap<String, String> = url::form_urlencoded::parse(body.as_bytes())
+            .into_owned()
+            .collect();
         let attachments_str = parsed.get("attachments").unwrap();
         serde_json::from_str::<Vec<Attachment>>(attachments_str).map_err(|e| e.into())
     }
@@ -102,7 +103,10 @@ impl Attachment {
 
     /// If the attachment has a URL but no content, grab the attachment
     /// content. Data is filled into the current struct.
-    pub async fn fetch(mut self, api_key: Option<&String>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn fetch(
+        mut self,
+        api_key: Option<&String>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         if self.content.is_some() {
             return Ok(self);
         }
@@ -126,14 +130,12 @@ impl Attachment {
 
 impl From<Attachment> for crate::email::Attachment {
     fn from(attachment: Attachment) -> crate::email::Attachment {
-        crate::email::Attachment::Regular(
-            crate::email::AttachmentData {
-                data: attachment.content.unwrap(),
-                mime: attachment.content_type,
-                name: attachment.name,
-                size: attachment.size,
-                ..Default::default()
-            }
-        )
+        crate::email::Attachment::Regular(crate::email::AttachmentData {
+            data: attachment.content.unwrap(),
+            mime: attachment.content_type,
+            name: attachment.name,
+            size: attachment.size,
+            ..Default::default()
+        })
     }
 }

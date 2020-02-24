@@ -86,7 +86,10 @@ impl Email {
     /// 1. Body (text and/or html)
     /// 2. Inline attachments
     /// 3. Regular attachments
-    fn parse_recursive(&mut self, part: &mailparse::ParsedMail) -> Result<(), Box<dyn std::error::Error>> {
+    fn parse_recursive(
+        &mut self,
+        part: &mailparse::ParsedMail,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let content_type = &part.ctype;
         let mimetype = &content_type.mimetype.to_lowercase();
 
@@ -143,23 +146,21 @@ impl Email {
     /// For now, this is limited to Subject and Message-ID
     fn parse_headers(&mut self, part: &mailparse::ParsedMail) {
         // NOTE(aksiksi): Can header names be lowercase?
-        let headers = part.headers.iter()
-                                  .filter(|h| {
-                                      let k = h.get_key().unwrap();
-                                      ["Subject", "Message-ID"].contains(&k.as_str())
-                                  })
-                                  .map(|h| {
-                                      (h.get_key().unwrap(), h.get_value().ok())
-                                  });
+        let headers = part
+            .headers
+            .iter()
+            .filter(|h| {
+                let k = h.get_key().unwrap();
+                ["Subject", "Message-ID"].contains(&k.as_str())
+            })
+            .map(|h| (h.get_key().unwrap(), h.get_value().ok()));
 
         for (k, v) in headers {
             if k == "Subject" {
                 self.subject = v;
             } else if k == "Message-ID" {
                 // Extract message ID, if available
-                self.message_id = v.map(|s| {
-                    s.replace("<", "").replace(">", "")
-                });
+                self.message_id = v.map(|s| s.replace("<", "").replace(">", ""));
             }
         }
     }
@@ -258,7 +259,7 @@ impl Attachment {
             Err(_) => {
                 log::error!("Attachment body not found");
                 return None;
-            },
+            }
         };
 
         d.size = d.data.len();
@@ -375,7 +376,6 @@ mod test {
     static SAMPLE_EMAIL_PATHS: &[&str] = &[
         // Content (multipart/alternative), Attachment, Attachment
         concat!(env!("CARGO_MANIFEST_DIR"), "/test", "/sample_email_1.txt"),
-
         // Content + Inline Attachment, Attachment, Attachment
         concat!(env!("CARGO_MANIFEST_DIR"), "/test", "/sample_email_2.txt"),
     ];

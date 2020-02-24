@@ -32,19 +32,23 @@ impl From<HashMap<String, String>> for Config {
     fn from(settings: HashMap<String, String>) -> Self {
         let mut config = Self::default();
 
-        config.port = settings.get("port")
-                              .and_then(|p| p.parse::<u16>().ok())
-                              .unwrap_or(DEFAULT_PORT);
+        config.port = settings
+            .get("port")
+            .and_then(|p| p.parse::<u16>().ok())
+            .unwrap_or(DEFAULT_PORT);
         config.mailgun_key = settings.get("mailgun_key").map(String::from);
-        config.db_host = settings.get("db_host")
-                                 .unwrap_or(&"127.0.0.1".to_string())
-                                 .to_string();
-        config.db_name = settings.get("db_name")
-                                 .unwrap_or(&DEFAULT_DB_NAME.to_string())
-                                 .to_string();
-        config.db_user = settings.get("db_user")
-                                 .unwrap_or(&DEFAULT_DB_USER.to_string())
-                                 .to_string();
+        config.db_host = settings
+            .get("db_host")
+            .unwrap_or(&"127.0.0.1".to_string())
+            .to_string();
+        config.db_name = settings
+            .get("db_name")
+            .unwrap_or(&DEFAULT_DB_NAME.to_string())
+            .to_string();
+        config.db_user = settings
+            .get("db_user")
+            .unwrap_or(&DEFAULT_DB_USER.to_string())
+            .to_string();
         config.db_password = settings.get("db_password").map(String::from);
 
         config
