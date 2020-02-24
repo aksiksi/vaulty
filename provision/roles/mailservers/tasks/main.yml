@@ -3,6 +3,10 @@
   apt:
     name: postfix-pgsql
     state: present
+- name: Install Postfix SPF policy server
+  apt:
+    name: postfix-policyd-spf-python
+    state: present
 - name: Build "vaulty-filter" and "vaulty-server" (release)
   local_action:
     module: shell

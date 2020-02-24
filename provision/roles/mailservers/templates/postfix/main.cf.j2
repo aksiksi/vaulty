@@ -54,6 +54,7 @@ smtpd_relay_restrictions =
     permit_mynetworks,
     permit_sasl_authenticated,
     defer_unauth_destination
+
 smtpd_recipient_restrictions =
     permit_sasl_authenticated,
     reject_invalid_hostname,
@@ -63,11 +64,14 @@ smtpd_recipient_restrictions =
     reject_unknown_sender_domain,
     reject_unknown_recipient_domain,
     permit_mynetworks,
+    reject_unauth_destination,
+    check_policy_service unix:private/policy-spf,
     reject_rbl_client list.dsbl.org,
     reject_rbl_client sbl.spamhaus.org,
     reject_rbl_client cbl.abuseat.org,
     reject_rbl_client dul.dnsbl.sorbs.net,
     permit
+
 disable_vrfy_command = yes
 smtpd_delay_reject = yes
 smtpd_helo_required = yes

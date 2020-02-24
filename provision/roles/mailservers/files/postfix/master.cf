@@ -133,3 +133,7 @@ mailman   unix  -       n       n       -       -       pipe
 vaulty_filter    unix  -       n       n       -       30      pipe
     flags=XRq user=vmail null_sender=
     argv=/usr/bin/vaulty_filter -r ${recipient} -s ${sender}
+
+# SPF recipient validation server
+policy-spf  unix  -       n       n       -       -       spawn
+     user=nobody argv=/usr/bin/policyd-spf
