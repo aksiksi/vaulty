@@ -1,0 +1,12 @@
+# The hosts that Postfix will try to connect to
+hosts = {% for host in groups['dbservers'] %}{{ hostvars[host].ansible_host }} {% endfor %}
+
+# The user name and password to log into the pgsql server.
+user = {{ vaulty_db_user }}
+# password = {{ vaulty_db_password }}
+
+# The database name on the servers.
+dbname = {{ vaulty_db_name }}
+
+# Postfix 2.2 and later The SQL query template. See pgsql_table(5).
+query = SELECT dest FROM aliases WHERE alias = '%s' AND is_active = true

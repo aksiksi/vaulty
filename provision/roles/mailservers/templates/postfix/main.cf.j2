@@ -5,6 +5,7 @@
 
 smtpd_banner = $myhostname ESMTP $mail_name (Debian/GNU)
 biff = no
+compatibility_level = 2
 
 # appending .domain is the MUA's job.
 append_dot_mydomain = no
@@ -29,23 +30,33 @@ mydomain = {{ vaulty_domain }}
 # For smaller sites, disabling this is preferred
 # myorigin = $mydomain
 
-myhostname = {{ inventory_hostname }}
+myhostname = {{ ansible_hostname }}
 mydestination = $myhostname, localhost.$mydomain, localhost.localdomain, localhost
 mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128 172.0.0.0/8 192.168.0.0/16
 relayhost =
-mailbox_size_limit = 0
 recipient_delimiter = +
 inet_interfaces = all
 default_transport = error
 relay_transport = error
+
+# Local user mailbox size = 500 MB
+mailbox_size_limit = 500000000
+
+# Max message size = 25 MB
+message_size_limit = 25000000
+
+# Maildir-style storage for local mail
+mail_spool_directory = /var/mail/
+
+# Export env vars to Postfix filter
 export_environment = {{ postfix_env }}
 
-# Virtual mailbox config
+# Virtual transport and mailbox config
 virtual_transport = vaulty_filter:
-virtual_mailbox_domains = $mydomain, mail.$mydomain
+virtual_mailbox_domains = $mydomain, mail.$mydomain, {{ inventory_hostname }}
 virtual_mailbox_base = {{ mail_dir }}
 virtual_mailbox_maps = pgsql:/etc/postfix/pgsql-vmail.cf
-virtual_alias_maps = hash:/etc/postfix/virtual
+virtual_alias_maps = pgsql:/etc/postfix/pgsql-valiases.cf
 virtual_uid_maps = static:{{ mail_uid }}
 virtual_gid_maps = static:{{ mail_gid }}
 
@@ -66,10 +77,7 @@ smtpd_recipient_restrictions =
     permit_mynetworks,
     reject_unauth_destination,
     check_policy_service unix:private/policy-spf,
-    reject_rbl_client list.dsbl.org,
     reject_rbl_client sbl.spamhaus.org,
-    reject_rbl_client cbl.abuseat.org,
-    reject_rbl_client dul.dnsbl.sorbs.net,
     permit
 
 disable_vrfy_command = yes

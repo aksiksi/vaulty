@@ -1,6 +1,8 @@
 SET TIMEZONE = 'America/New_York';
 
-DROP TABLE IF EXISTS logs, addresses, emails, users;
+DROP TABLE IF EXISTS logs, addresses, emails, users, aliases;
+
+DROP TYPE IF EXISTS storage_backend;
 
 CREATE TYPE storage_backend AS ENUM ('dropbox', 'gdrive', 's3');
 
@@ -61,6 +63,14 @@ CREATE TABLE logs (
     creation_time TIMESTAMPTZ DEFAULT current_timestamp
 );
 
+-- Aliases for Postfix
+CREATE TABLE aliases (
+    id SERIAL PRIMARY KEY,
+    is_active BOOLEAN DEFAULT true,
+    alias TEXT NOT NULL,
+    dest TEXT NOT NULL -- Email will be forwarded to this address or local user
+);
+
 -- Insert some test data
 INSERT INTO users (email, password, is_subscribed, creation_time) VALUES
     ('abc@abc.com', 'test123', FALSE, '2020-02-09 19:38:12-05:00'),
@@ -81,3 +91,7 @@ INSERT INTO logs (email_id, msg, log_level) VALUES
     ('00000000-0000-0000-0000-000000000000', 'HELLO THERE 1!', 1),
     ('00000000-0000-0000-0000-000000000000', 'HELLO THERE 2!', 1),
     ('00000000-0000-0000-0000-000000000000', 'HELLO THERE 3!', 1);
+
+INSERT INTO aliases (alias, dest) VALUES
+    ('postmaster@vaulty.net', 'vmail'),
+    ('support@vaulty.net', 'vmail');
