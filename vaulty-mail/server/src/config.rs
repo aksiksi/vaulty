@@ -19,9 +19,6 @@ pub struct Config {
     pub db_host: String,
     pub db_user: String,
     pub db_password: Option<String>,
-    pub use_tls: bool,
-    pub cert_path: Option<String>,
-    pub key_path: Option<String>,
 }
 
 impl Config {
@@ -53,12 +50,6 @@ impl From<HashMap<String, String>> for Config {
             .unwrap_or(&DEFAULT_DB_USER.to_string())
             .to_string();
         config.db_password = settings.get("db_password").map(String::from);
-        config.use_tls = settings
-            .get("use_tls")
-            .and_then(|e| e.parse::<bool>().ok())
-            .unwrap_or(false);
-        config.cert_path = settings.get("cert_path").map(String::from);
-        config.key_path = settings.get("key_path").map(String::from);
 
         config
     }

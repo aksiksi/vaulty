@@ -37,16 +37,6 @@ pub async fn run(arg: config::Config) {
 
     let port = arg.port;
 
-    if arg.use_tls {
-        log::info!("Starting HTTPS server at https://0.0.0.0:{}...", port);
-        warp::serve(router)
-            .tls()
-            .cert_path(arg.cert_path.as_ref().unwrap())
-            .key_path(arg.key_path.as_ref().unwrap())
-            .run(([0, 0, 0, 0], port))
-            .await;
-    } else {
-        log::info!("Starting HTTP server at http://0.0.0.0:{}...", port);
-        warp::serve(router).run(([0, 0, 0, 0], port)).await;
-    }
+    log::info!("Starting HTTP server at 0.0.0.0:{}...", port);
+    warp::serve(router).run(([0, 0, 0, 0], port)).await;
 }

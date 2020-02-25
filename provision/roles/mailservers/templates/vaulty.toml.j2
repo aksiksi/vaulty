@@ -11,12 +11,6 @@ db_user = "{{ vaulty_db_user }}"
 # db_password = PASSWORD
 # mailgun_key = YOUR_TOKEN
 
-# HTTP basic auth creds (unused)
+# HTTP basic auth creds
 auth_user = "{{ vaulty_user }}"
 auth_pass = "{{ vaulty_pass }}"
-server_address = "{{ inventory_hostname }}"
-
-# Force server to use TLS
-use_tls = true
-cert_path = "/etc/letsencrypt/live/{{ inventory_hostname }}/fullchain.pem"
-key_path = "/etc/letsencrypt/live/{{ inventory_hostname }}/privkey.pem"
