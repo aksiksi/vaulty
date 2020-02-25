@@ -1,4 +1,28 @@
 ---
+- name: Install Postfix
+  apt:
+    name: postfix
+    state: present
+- name: Ensure mail group exists
+  group:
+    name: "{{ mail_group }}"
+    gid: "{{ mail_gid }}"
+    state: present
+- name: Create mail user and assign to group
+  user:
+    name: "{{ mail_user }}"
+    uid: "{{ mail_uid }}"
+    groups: "sudo,{{ mail_group }}"
+    home: "{{ mail_dir }}"
+    create_home: true
+    state: present
+- name: Create maildir for user
+  file:
+    path: "/var/mail/{{ mail_user }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ mail_user }}"
+    group: "{{ mail_group }}"
 - name: Install Postfix pgsql
   apt:
     name: postfix-pgsql
@@ -26,11 +50,13 @@
   apt:
     name: certbot
     state: present
-# Note: Port 80 must not be taken (i.e., vaulty-web must be on another machine)
+# NOTE: Port 80 must not be taken (i.e., vaulty-web must be on another machine)
 - name: Configure and enable certbot
   command: sudo certbot certonly --standalone -d "{{ inventory_hostname }}" --non-interactive --agree-tos -m "{{ vaulty_postmaster }}"
   args:
     creates: "/etc/letsencrypt/live/{{ inventory_hostname }}/fullchain.pem"
+# NOTE: vmail user must have access to cert directories...
+# Otherwise, add vmail to sudo
 - name: Create crontab to renew certs
   cron:
     name: "Renew LetsEncrypt certs"
@@ -42,30 +68,6 @@
     path: "/etc/letsencrypt/renewal/{{ inventory_hostname }}.conf"
     line: "renew_hook = sudo systemctl reload postfix"
     state: present
-- name: Install Postfix
-  apt:
-    name: postfix
-    state: present
-- name: Ensure mail group exists
-  group:
-    name: "{{ mail_group }}"
-    gid: "{{ mail_gid }}"
-    state: present
-- name: Create mail user and assign to group
-  user:
-    name: "{{ mail_user }}"
-    uid: "{{ mail_uid }}"
-    group: "{{ mail_group }}"
-    home: "{{ mail_dir }}"
-    create_home: true
-    state: present
-- name: Create maildir for user
-  file:
-    path: "/var/mail/{{ mail_user }}"
-    state: directory
-    mode: '0755'
-    owner: "{{ mail_user }}"
-    group: "{{ mail_group }}"
 - name: Copy Postfix configs to "/etc/postfix"
   copy:
     src: "{{ item }}"
@@ -94,9 +96,6 @@
     owner: vmail
     group: vmail
     mode: u=rw,g=r,o=r
-- name: Rebuild virtual alias maps
-  shell: |
-    /usr/sbin/postmap /etc/postfix/virtual
 - name: Reload Postfix configs
   shell: postfix reload
 - name: Copy "vaulty_server" systemd unit
