@@ -9,7 +9,7 @@ vaulty = { path = "../lib" }
 env_logger = "0.7.1"
 log = "0.4.8"
 structopt = "0.3.9"
-reqwest = { version = "0.10.1" }
+reqwest = { version = "0.10.1", features = ["rustls-tls"] }
 serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.44"
 rmp-serde = "0.14.2"

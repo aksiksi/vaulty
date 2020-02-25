@@ -29,7 +29,7 @@ struct Opt {
 }
 
 async fn send_attachment(
-    remote_addr: &str,
+    url: &str,
     client: &reqwest::Client,
     attachment: &vaulty::email::Attachment,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -41,7 +41,7 @@ async fn send_attachment(
     let raw = rmp_serde::encode::to_vec_named(&attachment)?;
 
     let req = client
-        .post(&format!("http://{}:7777/postfix/attachment", remote_addr))
+        .post(&format!("{}/postfix/attachment", url))
         .header(reqwest::header::CONTENT_TYPE, attachment.get_mime())
         .basic_auth(VAULTY_USER.as_str(), Some(VAULTY_PASS.as_str()))
         .body(reqwest::Body::from(raw));
@@ -59,12 +59,23 @@ async fn send_attachment(
 async fn process(
     remote_addr: &str,
     mail: vaulty::email::Email,
+    use_tls: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let client = reqwest::Client::new();
+    let url = if use_tls {
+        format!("https://{}:7777", remote_addr)
+    } else {
+        format!("http://{}:7777", remote_addr)
+    };
+
+    let client = reqwest::ClientBuilder::new()
+        .use_rustls_tls()
+        .build()
+        .unwrap();
+
     let email = serde_json::to_string(&mail)?;
 
     let req = client
-        .post(&format!("http://{}:7777/postfix/email", remote_addr))
+        .post(&format!("{}/postfix/email", url))
         .basic_auth(VAULTY_USER.as_str(), Some(VAULTY_PASS.as_str()))
         .body(reqwest::Body::from(email));
 
@@ -92,7 +103,7 @@ async fn process(
         // 3. Collect the results into a `Vec`
         attachments
             .iter()
-            .map(|a| send_attachment(&remote_addr, &client, a))
+            .map(|a| send_attachment(&url, &client, a))
             .collect::<FuturesUnordered<_>>()
             .collect::<Vec<_>>()
             .await;
@@ -103,10 +114,18 @@ async fn process(
 
 #[tokio::main]
 async fn main() {
-    let remote_addr = match env::var("VAULTY_SERVER_ADDR") {
-        Ok(v) => v,
-        Err(_) => "127.0.0.1".to_string(),
-    };
+    // Determine if TLS is enabled using config lookup
+    // TODO: Load more stuff via config?
+    let config = vaulty::config::load_config(None);
+    let use_tls = config
+        .get("use_tls")
+        .and_then(|c| c.parse::<bool>().ok())
+        .unwrap_or(false);
+
+    let server_address = config
+        .get("server_address")
+        .map(String::from)
+        .unwrap_or("127.0.0.1".to_string());
 
     // Init logger
     env_logger::builder().format_timestamp_micros().init();
@@ -125,5 +144,5 @@ async fn main() {
         .with_sender(opt.sender)
         .with_recipients(opt.recipients);
 
-    process(&remote_addr, mail).await.unwrap();
+    process(&server_address, mail, use_tls).await.unwrap();
 }

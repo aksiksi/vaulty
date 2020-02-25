@@ -1,3 +1,7 @@
+// Added this because of a warning related to a Pin<impl Future ...>
+// My guess is that warp is getting crazy with the filter chains
+#![type_length_limit = "1377803"]
+
 mod config;
 mod controllers;
 mod errors;
