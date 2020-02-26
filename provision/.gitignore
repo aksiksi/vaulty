@@ -1,4 +1,4 @@
 roles/mailservers/files/vaulty.env
 inventory/dev.yml
-inventory/group_vars/*
 inventory/prod.yml
+group_vars/*

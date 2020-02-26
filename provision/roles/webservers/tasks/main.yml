@@ -1,8 +1,4 @@
 ---
-# - name: Set hostname
-#   hostname:
-#     name: "{{ inventory_hostname }}"
-#     use: debian
 - name: Install Python 3
   apt:
     name: python3
@@ -11,7 +7,40 @@
   apt:
     name: python3-pip
     state: present
+- name: Install venv
+  apt:
+    name: python3-venv
+    state: present
+- name: Create group
+  group:
+    name: "{{ vaulty_web_group }}"
+    state: present
+- name: Create user
+  user:
+    name: "{{ vaulty_web_user }}"
+    groups: "sudo,{{ vaulty_web_group }}"
+    create_home: true
+    shell: /bin/bash
+    state: present
 - name: Pull vaulty repo
   git:
-    repo: 'https://github.com/aksiksi/vaulty.git'
-    dest: /var/www/vaulty
+    repo: "{{ vaulty_repo }}"
+    dest: "{{ vaulty_web_repo_path }}"
+- name: Change repo ownership
+  file:
+    path: "{{ vaulty_web_repo_path }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ vaulty_web_user }}"
+    group: "{{ vaulty_web_group }}"
+    recurse: yes
+- name: Create virtualenv
+  become: yes
+  become_user: "{{ vaulty_web_user }}"
+  command:
+    cmd: python3 -m venv "{{ vaulty_web_venv_path }}"
+    creates: "{{ vaulty_web_venv_path }}"
+- name: Install Python packages
+  pip:
+    requirements: "{{ vaulty_web_code_path }}/requirements.txt"
+    virtualenv: "{{ vaulty_web_venv_path }}"
