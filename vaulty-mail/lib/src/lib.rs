@@ -1,6 +1,9 @@
+use bytes::Bytes;
 use chrono::offset::Utc;
+use futures::stream::Stream;
 
 pub mod config;
+pub mod constants;
 pub mod db;
 pub mod email;
 pub mod mailgun;
@@ -34,7 +37,9 @@ impl<'a> EmailHandler<'a> {
     pub async fn handle(
         &self,
         email: &email::Email,
-        attachment: Option<email::Attachment>,
+        attachment: Option<impl Stream<Item = Result<Bytes, Error>> + Send + Sync + 'static>,
+        attachment_name: String,
+        _attachment_size: usize,
     ) -> Result<(), Error> {
         log::info!(
             "Handling mail for {} on {}",
@@ -56,17 +61,14 @@ impl<'a> EmailHandler<'a> {
 
         // 4. Write all attachments to folder via Dropbox API
         if let Some(attachment) = attachment {
-            let attachment = attachment.data();
-            let _size = attachment.size;
-
-            let file_path = format!("{}/{}", self.storage_path, attachment.name);
+            let file_path = format!("{}/{}", self.storage_path, attachment_name);
 
             match self.storage_backend {
                 Backend::Dropbox => {
                     // Build a Dropbox client
                     let client = storage::dropbox::Client::from_token(self.storage_token);
 
-                    let result = client.upload(&file_path, attachment.data).await;
+                    let result = client.upload_stream(&file_path, attachment).await;
 
                     result.map_err(|e| e.into())
                 }

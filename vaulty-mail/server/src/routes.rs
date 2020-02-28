@@ -1,4 +1,4 @@
-use warp::{reply::Reply, Filter, Rejection};
+use warp::{http::header, reply::Reply, Filter, Rejection};
 
 use super::config;
 use super::controllers;
@@ -38,8 +38,22 @@ pub fn attachment(
         .and(warp::body::content_length_limit(
             config::MAX_ATTACHMENT_SIZE,
         ))
-        .and(warp::body::bytes())
-        .and_then(move |body| controllers::postfix::attachment(body, db.clone()))
+        .and(warp::filters::header::header::<usize>(
+            header::CONTENT_LENGTH.as_str(),
+        ))
+        .and(warp::filters::header::header::<String>(
+            header::CONTENT_TYPE.as_str(),
+        ))
+        .and(warp::filters::header::header::<String>(
+            vaulty::constants::VAULTY_EMAIL_ID,
+        ))
+        .and(warp::filters::header::header::<String>(
+            vaulty::constants::VAULTY_ATTACHMENT_NAME,
+        ))
+        .and(warp::filters::body::stream())
+        .and_then(move |size, content_type, mail_id, name, body| {
+            controllers::postfix::attachment(size, content_type, mail_id, name, body, db.clone())
+        })
 }
 
 /// Handles mail notifications from Mailgun

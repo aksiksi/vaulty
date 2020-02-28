@@ -309,6 +309,12 @@ impl Attachment {
         }
     }
 
+    pub fn get_data_owned(self) -> Vec<u8> {
+        match self {
+            Attachment::Inline(d) | Attachment::Regular(d) => d.data,
+        }
+    }
+
     pub fn is_regular(&self) -> bool {
         match self {
             Attachment::Inline(_) => false,

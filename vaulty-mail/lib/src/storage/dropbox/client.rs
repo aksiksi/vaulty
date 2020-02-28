@@ -1,3 +1,5 @@
+use bytes::Bytes;
+use futures::stream::Stream;
 use reqwest::header::CONTENT_TYPE;
 
 use super::api;
@@ -74,6 +76,32 @@ impl<'a> Client<'a> {
                 Some("application/octet-stream"),
             )
             .await?;
+        Ok(())
+    }
+
+    /// Upload a file to a user's Dropbox
+    /// This function does not return any API metadata
+    pub async fn upload_stream(
+        &self,
+        path: &str,
+        data: impl Stream<Item = Result<Bytes, crate::Error>> + Send + Sync + 'static,
+    ) -> Result<(), Error> {
+        // Auto-rename the attachment if it exists
+        let args = serde_json::json!({"path": path, "autorename": true}).to_string();
+        let url = api::build_endpoint_url(api::Endpoint::FileUpload);
+
+        let mut req = self
+            .client
+            .post(reqwest::Url::parse(&url)?)
+            .bearer_auth(&self.token)
+            .header(CONTENT_TYPE, "application/octet-stream")
+            .body(reqwest::Body::wrap_stream(data));
+
+        req = req.header(api::DROPBOX_ARG_HEADER, args);
+
+        // Map response into an error if applicable
+        let _resp = api::map_status(req.send().await?)?.bytes().await?;
+
         Ok(())
     }
 

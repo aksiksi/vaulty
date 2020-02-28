@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
-use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+use bytes::{buf::Buf, Bytes};
+use futures::stream::{self, FuturesUnordered, Stream, StreamExt, TryStreamExt};
 use lazy_static::lazy_static;
 use tokio::sync::RwLock;
 use warp::{
+    self,
     http::{self, Response},
     reply::Reply,
     Rejection,
@@ -191,31 +193,21 @@ pub mod postfix {
     }
 
     pub async fn attachment(
-        body: bytes::Bytes,
+        size: usize,
+        _content_type: String,
+        mail_id: String,
+        name: String,
+        body: impl Stream<Item = Result<impl Buf, warp::Error>> + Send + Sync + 'static,
         mut db: sqlx::PgPool,
     ) -> Result<impl Reply, Rejection> {
         let resp = Response::builder();
         let mut db_client = vaulty::db::Client::new(&mut db);
 
-        // TODO: Perhaps make this raw instead of MessagePack
-        let attachment: vaulty::email::Attachment =
-            match rmp_serde::decode::from_read(body.as_ref()) {
-                Err(e) => {
-                    let msg = e.to_string();
-                    log::error!("{}", msg);
-                    let err = errors::VaultyServerError { msg: msg };
-                    return Err(warp::reject::custom(err));
-                }
-                Ok(v) => v,
-            };
-
-        let uuid = attachment.get_email_id().to_string();
-
         // Acquire cache read lock and clone email
         // This minimizes read lock time
         let entry = {
             let cache = MAIL_CACHE.read().await;
-            cache.get(&uuid).unwrap().clone()
+            cache.get(&mail_id).unwrap().clone()
         };
 
         let email = &entry.email;
@@ -229,32 +221,29 @@ pub mod postfix {
         // entry. Get this done early to minimize the chance of leaking an entry.
         {
             let mut cache = MAIL_CACHE.write().await;
-            let e = &mut cache.get_mut(&uuid).unwrap();
+            let e = &mut cache.get_mut(&mail_id).unwrap();
             let attachment_count = e.email.num_attachments.as_mut().unwrap();
 
             *attachment_count -= 1;
 
             if *attachment_count == 0 {
-                log::info!("Removing {} from cache", uuid);
-                cache.remove(&uuid);
+                log::info!("Removing {} from cache", mail_id);
+                cache.remove(&mail_id);
             }
         }
 
         log::info!(
             "Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
-            attachment.get_name(),
+            name,
             recipient,
-            attachment.get_size(),
-            uuid
+            size,
+            mail_id
         );
 
         let resp = resp
             .body(format!(
                 "Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
-                attachment.get_name(),
-                recipient,
-                attachment.get_size(),
-                uuid
+                name, recipient, size, mail_id
             ))
             .unwrap();
 
@@ -264,7 +253,16 @@ pub mod postfix {
             &address.storage_path,
         );
 
-        let h = handler.handle(email, Some(attachment)).await;
+        let attachment = body.map_ok(|mut b| b.to_bytes());
+
+        let h = handler
+            .handle(
+                email,
+                Some(attachment.map_err(|e| vaulty::Error::GenericError(e.to_string()))),
+                name,
+                size,
+            )
+            .await;
 
         if let Err(e) = h.as_ref() {
             db_client
@@ -344,15 +342,26 @@ pub async fn mailgun(
         .collect::<FuturesUnordered<_>>()
         .map_ok(|a| email::Attachment::from(a))
         .map_err(|e| vaulty::Error::GenericError(e.to_string()))
-        .and_then(|a| handler.handle(&mail, Some(a)))
+        .and_then(|a| {
+            let name = a.get_name().clone();
+            let size = a.get_size();
+            let data = vec![Ok(Bytes::from(a.get_data_owned()))];
+            let data = stream::iter(data);
+            handler.handle(&mail, Some(data), name, size)
+        })
         .map_err(|_| warp::reject::not_found());
 
-    let email_task = handler.handle(&mail, None);
-    if let Err(_) = email_task.await {
-        return Err(warp::reject::not_found());
-    }
+    // TODO: Consider making handle_email and handle_attachment
+    // Compiler complains about "unknown" type for the Option
+    // let email_task = handler.handle(&mail, None, "", 0).await;
+    // if let Err(_) = email_task {
+    //     return Err(warp::reject::not_found());
+    // }
 
-    for r in attachment_tasks.collect::<Vec<_>>().await {
+    for r in attachment_tasks
+        .collect::<Vec<Result<(), warp::reject::Rejection>>>()
+        .await
+    {
         if let Err(_) = r {
             return Err(warp::reject::not_found());
         }

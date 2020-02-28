@@ -31,20 +31,27 @@ struct Opt {
 async fn send_attachment(
     remote_addr: &str,
     client: &reqwest::Client,
-    attachment: &vaulty::email::Attachment,
+    email: &vaulty::email::Email,
+    attachment: vaulty::email::Attachment,
 ) -> Result<(), Box<dyn std::error::Error>> {
     log::info!(
         "Processing attachment for email: {}",
         attachment.get_email_id().to_string()
     );
 
-    let raw = rmp_serde::encode::to_vec_named(&attachment)?;
-
+    // Body just contains the attachment
+    // All metadata passed along as headers
     let req = client
         .post(&format!("http://{}:7777/postfix/attachment", remote_addr))
         .header(reqwest::header::CONTENT_TYPE, attachment.get_mime())
+        .header(reqwest::header::CONTENT_LENGTH, attachment.get_size())
+        .header(vaulty::constants::VAULTY_EMAIL_ID, &email.uuid.to_string())
+        .header(
+            vaulty::constants::VAULTY_ATTACHMENT_NAME,
+            attachment.get_name(),
+        )
         .basic_auth(VAULTY_USER.as_str(), Some(VAULTY_PASS.as_str()))
-        .body(reqwest::Body::from(raw));
+        .body(reqwest::Body::from(attachment.get_data_owned()));
 
     let resp = req.send().await?;
     let bytes = &resp.bytes().await?;
@@ -58,7 +65,7 @@ async fn send_attachment(
 /// Transmit this email to the Vaulty processing server
 async fn process(
     remote_addr: &str,
-    mail: vaulty::email::Email,
+    mut mail: vaulty::email::Email,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
     let email = serde_json::to_string(&mail)?;
@@ -86,13 +93,15 @@ async fn process(
         }
     }
 
-    if let Some(attachments) = &mail.attachments {
+    let attachments = mail.attachments.take();
+
+    if let Some(attachments) = attachments {
         // 1. Create an iterator of `Future<Result<_, _>>`
         // 2. Collect the futures in a `FuturesUnordered`
         // 3. Collect the results into a `Vec`
         attachments
-            .iter()
-            .map(|a| send_attachment(&remote_addr, &client, a))
+            .into_iter()
+            .map(|a| send_attachment(&remote_addr, &client, &mail, a))
             .collect::<FuturesUnordered<_>>()
             .collect::<Vec<_>>()
             .await;
