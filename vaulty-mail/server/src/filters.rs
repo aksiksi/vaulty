@@ -11,7 +11,7 @@ pub fn basic_auth() -> impl Filter<Extract = (), Error = Rejection> + Clone {
             let full = format!("{}:{}", config::VAULTY_USER, config::VAULTY_PASS);
 
             if !auth.contains(&base64::encode(&full)) {
-                Err(warp::reject::custom(errors::Unauthorized))
+                Err(warp::reject::custom(errors::Error::Unauthorized))
             } else {
                 Ok(())
             }

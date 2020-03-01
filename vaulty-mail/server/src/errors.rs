@@ -3,16 +3,12 @@ use std::convert::Infallible;
 use warp::{http::StatusCode, Rejection, Reply};
 
 #[derive(Debug)]
-pub struct Unauthorized;
-
-impl warp::reject::Reject for Unauthorized {}
-
-#[derive(Debug)]
-pub struct VaultyServerError {
-    pub msg: String,
+pub enum Error {
+    Unauthorized,
+    Generic(String),
 }
 
-impl warp::reject::Reject for VaultyServerError {}
+impl warp::reject::Reject for Error {}
 
 // TODO: Map to JSON string with more descriptive output
 pub async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
@@ -21,12 +17,12 @@ pub async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> 
             "NOT FOUND".to_string(),
             StatusCode::NOT_FOUND,
         ))
-    } else if let Some(Unauthorized) = err.find() {
+    } else if let Some(Error::Unauthorized) = err.find() {
         Ok(warp::reply::with_status(
             "AUTH REQUIRED".to_string(),
             StatusCode::UNAUTHORIZED,
         ))
-    } else if let Some(VaultyServerError { msg: e }) = err.find() {
+    } else if let Some(Error::Generic(e)) = err.find() {
         Ok(warp::reply::with_status(
             e.clone(),
             StatusCode::UNAUTHORIZED,

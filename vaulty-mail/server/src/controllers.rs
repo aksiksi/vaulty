@@ -13,7 +13,7 @@ use warp::{
 
 use vaulty::{db::LogLevel, email, mailgun};
 
-use super::errors;
+use super::errors::Error;
 
 // Cache entry is cloneable to reduce read lock hold time
 #[derive(Clone)]
@@ -43,7 +43,7 @@ pub mod postfix {
             Err(e) => {
                 let msg = e.to_string();
                 log::error!("{}", msg);
-                let err = errors::VaultyServerError { msg: msg };
+                let err = Error::Generic(msg);
 
                 return Err(warp::reject::custom(err));
             }
@@ -86,7 +86,7 @@ pub mod postfix {
             if let Err(e) = valid {
                 let msg = e.to_string();
                 log::error!("{}", msg);
-                let err = errors::VaultyServerError { msg: msg };
+                let err = Error::Generic(msg);
                 return Err(warp::reject::custom(err));
             }
 
@@ -109,8 +109,7 @@ pub mod postfix {
         if let Err(e) = db_client.insert_email(&email).await {
             let msg = e.to_string();
             log::error!("{}", msg);
-            let err = errors::VaultyServerError { msg: msg };
-
+            let err = Error::Generic(msg);
             return Err(warp::reject::custom(err));
         }
 
@@ -149,8 +148,7 @@ pub mod postfix {
         if let Err(e) = db_client.update_address_received_count(&address).await {
             let msg = e.to_string();
             log::error!("{}", msg);
-            let err = errors::VaultyServerError { msg: msg };
-
+            let err = Error::Generic(msg);
             return Err(warp::reject::custom(err));
         }
 
@@ -172,7 +170,7 @@ pub mod postfix {
         let result = resp
             .body(format!("{}, {}", email.sender, uuid))
             .map_err(|e| {
-                let err = errors::VaultyServerError { msg: e.to_string() };
+                let err = Error::Generic(e.to_string());
                 warp::reject::custom(err)
             });
 
@@ -258,7 +256,7 @@ pub mod postfix {
         let h = handler
             .handle(
                 email,
-                Some(attachment.map_err(|e| vaulty::Error::GenericError(e.to_string()))),
+                Some(attachment.map_err(|e| vaulty::Error::Generic(e.to_string()))),
                 name,
                 size,
             )
@@ -271,7 +269,7 @@ pub mod postfix {
         }
 
         let resp = h.map(|_| resp).map_err(|e| {
-            let err = errors::VaultyServerError { msg: e.to_string() };
+            let err = Error::Generic(e.to_string());
             warp::reject::custom(err)
         });
 
@@ -341,7 +339,7 @@ pub async fn mailgun(
         .map(|a| a.fetch(api_key.as_ref()))
         .collect::<FuturesUnordered<_>>()
         .map_ok(|a| email::Attachment::from(a))
-        .map_err(|e| vaulty::Error::GenericError(e.to_string()))
+        .map_err(|e| vaulty::Error::Generic(e.to_string()))
         .and_then(|a| {
             let name = a.get_name().clone();
             let size = a.get_size();
