@@ -4,12 +4,7 @@ use bytes::{buf::Buf, Bytes};
 use futures::stream::{self, FuturesUnordered, Stream, StreamExt, TryStreamExt};
 use lazy_static::lazy_static;
 use tokio::sync::RwLock;
-use warp::{
-    self,
-    http::{self, Response},
-    reply::Reply,
-    Rejection,
-};
+use warp::{self, http::Response, reply::Reply, Rejection};
 
 use vaulty::{db::LogLevel, email, mailgun};
 
@@ -44,7 +39,6 @@ pub mod postfix {
                 let msg = e.to_string();
                 log::error!("{}", msg);
                 let err = Error::Generic(msg);
-
                 return Err(warp::reject::custom(err));
             }
         };
@@ -70,10 +64,8 @@ pub mod postfix {
                 log::warn!("{}", msg);
                 db_client.log(&msg, None, LogLevel::Warning).await;
 
-                let status = http::status::StatusCode::UNPROCESSABLE_ENTITY;
-                let resp = Response::builder().status(status).body(msg);
-
-                return Ok(resp.unwrap());
+                let err = Error::InvalidArg(msg);
+                return Err(warp::reject::custom(err));
             }
             Some(a) => a,
         };
@@ -94,9 +86,8 @@ pub mod postfix {
                 // Sender is not on the whitelist
                 // Fail gracefully...
                 let msg = "Rejecting email due to non-whitelisted sender".to_string();
-                let status = http::status::StatusCode::UNPROCESSABLE_ENTITY;
-                let resp = Response::builder().status(status).body(msg);
-                return Ok(resp.unwrap());
+                let err = Error::InvalidArg(msg);
+                return Err(warp::reject::custom(err));
             }
         }
 
@@ -137,9 +128,8 @@ pub mod postfix {
 
             db_client.update_email(&email, false, Some(&msg)).await;
 
-            let status = http::status::StatusCode::UNPROCESSABLE_ENTITY;
-            let resp = Response::builder().status(status).body(msg);
-            return Ok(resp.unwrap());
+            let err = Error::InvalidArg(msg);
+            return Err(warp::reject::custom(err));
         }
 
         // Increment received email count at the start
