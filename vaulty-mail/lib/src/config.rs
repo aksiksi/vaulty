@@ -15,14 +15,19 @@ const DEFAULT_DB_USER: &str = "vaulty";
 
 #[derive(Clone, Debug, Default)]
 pub struct Config {
+    /// Server settings
     pub port: u16,
     pub mailgun_key: Option<String>,
     pub max_email_size: u64,
     pub max_attachment_size: u64,
-    pub vaulty_user: String,
-    pub vaulty_pass: String,
-    pub db_name: String,
+
+    /// HTTP basic auth credentials
+    pub auth_user: String,
+    pub auth_pass: String,
+
+    /// Database config
     pub db_host: String,
+    pub db_name: String,
     pub db_user: String,
     pub db_password: Option<String>,
 }
@@ -64,12 +69,12 @@ impl From<HashMap<String, String>> for Config {
             .get("max_attachment_size")
             .and_then(|p| p.parse::<u64>().ok())
             .unwrap_or(MAX_ATTACHMENT_SIZE);
-        config.vaulty_user = settings
-            .get("vaulty_user")
+        config.auth_user = settings
+            .get("auth_user")
             .unwrap_or(&DEFAULT_VAULTY_USER.to_string())
             .to_string();
-        config.vaulty_pass = settings
-            .get("vaulty_pass")
+        config.auth_pass = settings
+            .get("auth_pass")
             .unwrap_or(&DEFAULT_VAULTY_PASS.to_string())
             .to_string();
         config.db_host = settings
