@@ -1,5 +1,5 @@
 use super::config;
-use super::errors;
+use super::error::Error;
 
 use warp::{Filter, Rejection};
 
@@ -11,7 +11,7 @@ pub fn basic_auth() -> impl Filter<Extract = (), Error = Rejection> + Clone {
             let full = format!("{}:{}", config::VAULTY_USER, config::VAULTY_PASS);
 
             if !auth.contains(&base64::encode(&full)) {
-                Err(warp::reject::custom(errors::Error::Unauthorized))
+                Err(warp::reject::custom(Error::Unauthorized))
             } else {
                 Ok(())
             }

@@ -1,6 +1,6 @@
 mod backends;
 pub mod dropbox;
-mod errors;
+mod error;
 
 pub use backends::Backend;
-pub use errors::Error;
+pub use error::Error;

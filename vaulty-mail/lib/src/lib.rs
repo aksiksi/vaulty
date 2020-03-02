@@ -9,8 +9,8 @@ pub mod email;
 pub mod mailgun;
 pub mod storage;
 
-mod errors;
-pub use errors::Error;
+mod error;
+pub use error::Error;
 
 use storage::Backend;
 

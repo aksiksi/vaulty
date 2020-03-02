@@ -8,7 +8,7 @@ use warp::{self, http::Response, reply::Reply, Rejection};
 
 use vaulty::{db::LogLevel, email, mailgun};
 
-use super::errors::Error;
+use super::error::Error;
 
 // Cache entry is cloneable to reduce read lock hold time
 #[derive(Clone)]

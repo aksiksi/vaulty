@@ -1,7 +1,7 @@
 use warp::{self, Filter};
 
 use super::config;
-use super::errors;
+use super::error;
 use super::routes;
 
 pub async fn get_db_pool(arg: &config::Config) -> sqlx::PgPool {
@@ -33,7 +33,7 @@ pub async fn run(arg: config::Config) {
     let get = warp::get().and(index);
     let post = warp::post().and(mailgun.or(postfix));
 
-    let router = get.or(post).recover(errors::handle_rejection);
+    let router = get.or(post).recover(error::handle_rejection);
 
     let port = arg.port;
 
