@@ -59,10 +59,7 @@ impl<'a> Client<'a> {
     }
 
     /// Convert a recipient email to a user ID
-    pub async fn get_user_id(
-        &mut self,
-        recipient: &str,
-    ) -> Result<i32, Box<dyn std::error::Error>> {
+    pub async fn get_user_id(&mut self, recipient: &str) -> Result<i32, sqlx::Error> {
         let query = format!(
             "SELECT user_id FROM {} WHERE address = $1",
             &self.address_table
@@ -85,7 +82,7 @@ impl<'a> Client<'a> {
     pub async fn get_address(
         &mut self,
         recipients: &Vec<&str>,
-    ) -> Result<Option<Address>, Box<dyn std::error::Error>> {
+    ) -> Result<Option<Address>, sqlx::Error> {
         // Build a SQL list of values to check against
         // NOTE: This may need to be sanitizied
         let address_list = recipients
@@ -125,7 +122,7 @@ impl<'a> Client<'a> {
     pub async fn update_address_received_count(
         &mut self,
         address: &Address,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), sqlx::Error> {
         // For now, just increment the received count
         let query = format!(
             "
@@ -149,7 +146,7 @@ impl<'a> Client<'a> {
         &mut self,
         address: &Address,
         email: &Email,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
+    ) -> Result<bool, sqlx::Error> {
         let sender = &email.sender;
         let recipient = &address.address;
 
@@ -214,7 +211,7 @@ impl<'a> Client<'a> {
 
     /// Insert an email into DB
     /// Status and error message must be updated later
-    pub async fn insert_email(&mut self, email: &Email) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn insert_email(&mut self, email: &Email) -> Result<(), sqlx::Error> {
         let email_id = &email.uuid;
         let num_attachments = email.num_attachments.unwrap_or(0);
 

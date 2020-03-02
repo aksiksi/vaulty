@@ -5,7 +5,8 @@ use warp::{http::StatusCode, Rejection, Reply};
 #[derive(Debug)]
 pub enum Error {
     Unauthorized,
-    InvalidArg(String),
+    RejectedEmail(String),
+    Database(String),
     Generic(String),
 }
 
@@ -23,21 +24,39 @@ pub async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> 
             "AUTH REQUIRED".to_string(),
             StatusCode::UNAUTHORIZED,
         ))
-    } else if let Some(Error::InvalidArg(e)) = err.find() {
+    } else if let Some(Error::RejectedEmail(e)) = err.find() {
         // Invalid argument; processed gracefully on the filter side
         Ok(warp::reply::with_status(
             e.clone(),
             StatusCode::UNPROCESSABLE_ENTITY,
         ))
+    } else if let Some(Error::Database(e)) = err.find() {
+        // Invalid argument; processed gracefully on the filter side
+        Ok(warp::reply::with_status(
+            e.clone(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ))
     } else if let Some(Error::Generic(e)) = err.find() {
         Ok(warp::reply::with_status(
             e.clone(),
-            StatusCode::UNAUTHORIZED,
+            StatusCode::INTERNAL_SERVER_ERROR,
         ))
     } else {
         Ok(warp::reply::with_status(
             "INTERNAL SERVER ERROR".to_string(),
             StatusCode::INTERNAL_SERVER_ERROR,
         ))
+    }
+}
+
+impl From<vaulty::Error> for Error {
+    fn from(err: vaulty::Error) -> Self {
+        Self::Generic(err.to_string())
+    }
+}
+
+impl From<sqlx::Error> for Error {
+    fn from(err: sqlx::Error) -> Self {
+        Self::Database(err.to_string())
     }
 }

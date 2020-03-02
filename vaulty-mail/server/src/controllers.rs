@@ -38,8 +38,7 @@ pub mod postfix {
             Err(e) => {
                 let msg = e.to_string();
                 log::error!("{}", msg);
-                let err = Error::Generic(msg);
-                return Err(warp::reject::custom(err));
+                return Err(warp::reject::custom(Error::from(e)));
             }
         };
 
@@ -64,7 +63,7 @@ pub mod postfix {
                 log::warn!("{}", msg);
                 db_client.log(&msg, None, LogLevel::Warning).await;
 
-                let err = Error::InvalidArg(msg);
+                let err = Error::RejectedEmail(msg);
                 return Err(warp::reject::custom(err));
             }
             Some(a) => a,
@@ -74,19 +73,17 @@ pub mod postfix {
         // We scope this to avoid compiler nags about dyn Error
         {
             let valid = db_client.validate_sender_address(&address, &email).await;
-
             if let Err(e) = valid {
                 let msg = e.to_string();
                 log::error!("{}", msg);
-                let err = Error::Generic(msg);
-                return Err(warp::reject::custom(err));
+                return Err(warp::reject::custom(Error::from(e)));
             }
 
             if !valid.unwrap() {
                 // Sender is not on the whitelist
                 // Fail gracefully...
                 let msg = "Rejecting email due to non-whitelisted sender".to_string();
-                let err = Error::InvalidArg(msg);
+                let err = Error::RejectedEmail(msg);
                 return Err(warp::reject::custom(err));
             }
         }
@@ -100,8 +97,7 @@ pub mod postfix {
         if let Err(e) = db_client.insert_email(&email).await {
             let msg = e.to_string();
             log::error!("{}", msg);
-            let err = Error::Generic(msg);
-            return Err(warp::reject::custom(err));
+            return Err(warp::reject::custom(Error::from(e)));
         }
 
         // Verify that address quota is not exceeded with this email
@@ -128,18 +124,17 @@ pub mod postfix {
 
             db_client.update_email(&email, false, Some(&msg)).await;
 
-            let err = Error::InvalidArg(msg);
+            let err = Error::RejectedEmail(msg);
             return Err(warp::reject::custom(err));
         }
 
-        // Increment received email count at the start
+        // Increment received email count for this address
         // If this fails, do not proceed with processing this email
         // TODO: Can we do this in a single transaction (merge with above)?
         if let Err(e) = db_client.update_address_received_count(&address).await {
             let msg = e.to_string();
             log::error!("{}", msg);
-            let err = Error::Generic(msg);
-            return Err(warp::reject::custom(err));
+            return Err(warp::reject::custom(Error::from(e)));
         }
 
         let msg = format!("Got email for recipient {}", recipient);
@@ -151,11 +146,6 @@ pub mod postfix {
         let resp = Response::builder();
 
         log::info!("{}, {}", email.sender, uuid);
-
-        // TODO(aksiksi): Perform checks here and return HTTP error
-        // if any checks failed. This will stop filter from processing
-        // any attachments.
-        // Update the email state if validation fails
 
         let result = resp
             .body(format!("{}, {}", email.sender, uuid))
@@ -241,29 +231,23 @@ pub mod postfix {
             &address.storage_path,
         );
 
-        let attachment = body.map_ok(|mut b| b.to_bytes());
+        let attachment = body
+            .map_ok(|mut b| b.to_bytes())
+            .map_err(|e| vaulty::Error::Generic(e.to_string()));
 
-        let h = handler
-            .handle(
-                email,
-                Some(attachment.map_err(|e| vaulty::Error::Generic(e.to_string()))),
-                name,
-                size,
-            )
-            .await;
+        let h = handler.handle(email, Some(attachment), name, size).await;
 
+        // If an error occurred while processing this attachment,
+        // mark the email as failed
         if let Err(e) = h.as_ref() {
             db_client
                 .update_email(&email, false, Some(&e.to_string()))
                 .await;
         }
 
-        let resp = h.map(|_| resp).map_err(|e| {
-            let err = Error::Generic(e.to_string());
-            warp::reject::custom(err)
-        });
-
-        // TODO: If result contains an error, log this to DB
+        let resp = h
+            .map(|_| resp)
+            .map_err(|e| warp::reject::custom(Error::from(e)));
 
         resp
     }
