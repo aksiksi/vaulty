@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use warp::{http::header, reply::Reply, Filter, Rejection};
 
-use super::config;
 use super::controllers;
 use super::filters;
+
+use vaulty::config::Config;
 
 pub fn index() -> impl Filter<Extract = (&'static str,), Error = Rejection> + Clone {
     // GET /hello/warp => 200 OK with body "Hello, warp!"
@@ -12,17 +15,21 @@ pub fn index() -> impl Filter<Extract = (&'static str,), Error = Rejection> + Cl
 /// Route for /postfix
 pub fn postfix(
     db: sqlx::PgPool,
+    config: Arc<Config>,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    email(db.clone()).or(attachment(db.clone()))
+    email(db.clone(), config.clone()).or(attachment(db.clone(), config.clone()))
 }
 
 /// Route for /postfix/email
 /// Handles email body and creates a cache entry to track attachments
-pub fn email(db: sqlx::PgPool) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
+pub fn email(
+    db: sqlx::PgPool,
+    config: Arc<Config>,
+) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     warp::path!("postfix" / "email")
         .and(warp::path::end())
-        .and(filters::basic_auth())
-        .and(warp::body::content_length_limit(config::MAX_EMAIL_SIZE))
+        .and(warp::body::content_length_limit(config.max_email_size))
+        .and(filters::basic_auth(config))
         .and(warp::body::json())
         .and_then(move |email| controllers::postfix::email(email, db.clone()))
 }
@@ -31,13 +38,12 @@ pub fn email(db: sqlx::PgPool) -> impl Filter<Extract = (impl Reply,), Error = R
 /// Handles each email attachment
 pub fn attachment(
     db: sqlx::PgPool,
+    config: Arc<Config>,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     warp::path!("postfix" / "attachment")
         .and(warp::path::end())
-        .and(filters::basic_auth())
-        .and(warp::body::content_length_limit(
-            config::MAX_ATTACHMENT_SIZE,
-        ))
+        .and(warp::body::content_length_limit(config.max_attachment_size))
+        .and(filters::basic_auth(config))
         .and(warp::filters::header::header::<usize>(
             header::CONTENT_LENGTH.as_str(),
         ))
@@ -58,11 +64,13 @@ pub fn attachment(
 
 /// Handles mail notifications from Mailgun
 pub fn mailgun(
-    api_key: Option<String>,
+    config: Arc<Config>,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     warp::path("mailgun")
         .and(warp::path::end())
-        .and(warp::body::content_length_limit(config::MAX_EMAIL_SIZE))
+        .and(warp::body::content_length_limit(
+            vaulty::config::MAX_EMAIL_SIZE,
+        ))
         .and(warp::header::optional::<String>("content-type"))
         .and(
             warp::body::bytes().and_then(|body: bytes::Bytes| async move {
@@ -72,6 +80,6 @@ pub fn mailgun(
             }),
         )
         .and_then(move |content_type, body| {
-            controllers::mailgun(content_type, body, api_key.clone())
+            controllers::mailgun(content_type, body, config.mailgun_key.clone())
         })
 }

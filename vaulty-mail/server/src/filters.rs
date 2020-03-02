@@ -1,14 +1,22 @@
-use super::config;
+use std::sync::Arc;
+
 use super::error::Error;
 
-use warp::{Filter, Rejection};
+use vaulty::config::Config;
+
+use warp::{filters::BoxedFilter, Filter};
 
 /// Simple filter for HTTP Basic Authentication
-/// Currently just checks against a static user/pass
-pub fn basic_auth() -> impl Filter<Extract = (), Error = Rejection> + Clone {
+///
+/// User and pass checked against those set in config file
+pub fn basic_auth(config: Arc<Config>) -> BoxedFilter<()> {
     warp::header::<String>("Authorization")
-        .and_then(|auth: String| async move {
-            let full = format!("{}:{}", config::VAULTY_USER, config::VAULTY_PASS);
+        .and(warp::any().map(move || config.clone()))
+        .and_then(|auth: String, config: Arc<Config>| async move {
+            let user = &config.vaulty_user;
+            let pass = &config.vaulty_pass;
+
+            let full = format!("{}:{}", user, pass);
 
             if !auth.contains(&base64::encode(&full)) {
                 Err(warp::reject::custom(Error::Unauthorized))
@@ -17,4 +25,5 @@ pub fn basic_auth() -> impl Filter<Extract = (), Error = Rejection> + Clone {
             }
         })
         .untuple_one()
+        .boxed()
 }

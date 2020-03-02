@@ -1,16 +1,19 @@
+use std::sync::Arc;
+
 use warp::{self, Filter};
 
-use super::config;
 use super::error;
 use super::routes;
 
-pub async fn get_db_pool(arg: &config::Config) -> sqlx::PgPool {
-    let db_host = &arg.db_host;
-    let db_name = &arg.db_name;
-    let db_user = &arg.db_user;
+use vaulty::config::Config;
 
-    let db_path = if arg.db_password.is_some() {
-        let db_password = arg.db_password.as_ref().unwrap();
+pub async fn get_db_pool(config: &Config) -> sqlx::PgPool {
+    let db_host = &config.db_host;
+    let db_name = &config.db_name;
+    let db_user = &config.db_user;
+
+    let db_path = if config.db_password.is_some() {
+        let db_password = config.db_password.as_ref().unwrap();
         format!(
             "postgres://{}:{}@{}/{}",
             db_user, db_password, db_host, db_name
@@ -22,12 +25,15 @@ pub async fn get_db_pool(arg: &config::Config) -> sqlx::PgPool {
     sqlx::PgPool::new(&db_path).await.unwrap()
 }
 
-pub async fn run(arg: config::Config) {
+pub async fn run(arg: Config) {
     let pool = get_db_pool(&arg).await;
     log::info!("Connected to Postgres DB: {}/{}", arg.db_host, arg.db_name);
 
-    let mailgun = routes::mailgun(arg.mailgun_key);
-    let postfix = routes::postfix(pool.clone());
+    // Use Arc to share config across threads on server
+    let config = Arc::new(arg);
+
+    let mailgun = routes::mailgun(config.clone());
+    let postfix = routes::postfix(pool.clone(), config.clone());
     let index = routes::index();
 
     let get = warp::get().and(index);
@@ -35,7 +41,7 @@ pub async fn run(arg: config::Config) {
 
     let router = get.or(post).recover(error::handle_rejection);
 
-    let port = arg.port;
+    let port = config.port;
 
     log::info!("Starting HTTP server at 0.0.0.0:{}...", port);
     warp::serve(router).run(([0, 0, 0, 0], port)).await;

@@ -1,4 +1,3 @@
-mod config;
 mod controllers;
 mod error;
 mod filters;
@@ -6,6 +5,8 @@ mod http;
 mod routes;
 
 use clap::{App, Arg};
+
+use vaulty::config;
 
 #[tokio::main]
 async fn main() {
@@ -22,7 +23,7 @@ async fn main() {
                 .long("config-path")
                 .help("Path to Vaulty config")
                 .value_name("CONFIG_PATH")
-                .default_value(vaulty::config::DEFAULT_PATH)
+                .default_value(vaulty::config::DEFAULT_CONFIG_PATH)
                 .takes_value(true),
         )
         .get_matches();
