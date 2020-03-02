@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bytes::Bytes;
 use futures::stream::Stream;
 use reqwest::header::CONTENT_TYPE;
@@ -12,9 +14,13 @@ pub struct Client<'a> {
 
 impl<'a> Client<'a> {
     pub fn from_token(token: &'a str) -> Self {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(api::DROPBOX_REQUEST_TIMEOUT))
+            .build()
+            .unwrap();
         Self {
             token: token,
-            client: reqwest::Client::new(),
+            client: client,
         }
     }
 

@@ -1,5 +1,6 @@
 use std::env;
 use std::io::Read;
+use std::time::Duration;
 
 use futures::stream::{FuturesUnordered, StreamExt};
 
@@ -14,6 +15,9 @@ lazy_static! {
     static ref VAULTY_USER: String = env::var("VAULTY_USER").expect("No auth username found!");
     static ref VAULTY_PASS: String = env::var("VAULTY_PASS").expect("No auth username found!");
 }
+
+// Request timeout, in seconds
+const REQUEST_TIMEOUT: u64 = 15;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -53,7 +57,16 @@ async fn send_attachment(
         .basic_auth(VAULTY_USER.as_str(), Some(VAULTY_PASS.as_str()))
         .body(reqwest::Body::from(attachment.get_data_owned()));
 
-    let resp = req.send().await?;
+    let resp = req.send().await;
+    if let Err(e) = resp {
+        if e.is_timeout() {
+            log::error!("Request to server timed out...: {}", e.to_string());
+        }
+
+        return Err(Box::new(e));
+    }
+
+    let resp = resp.unwrap();
     let bytes = &resp.bytes().await?;
     let resp_str = std::str::from_utf8(bytes)?;
 
@@ -67,7 +80,10 @@ async fn process(
     remote_addr: &str,
     mut mail: vaulty::email::Email,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(REQUEST_TIMEOUT))
+        .build()
+        .unwrap();
     let email = serde_json::to_string(&mail)?;
 
     let req = client
@@ -75,7 +91,18 @@ async fn process(
         .basic_auth(VAULTY_USER.as_str(), Some(VAULTY_PASS.as_str()))
         .body(reqwest::Body::from(email));
 
-    let resp = req.send().await?;
+    let resp = req.send().await;
+
+    if let Err(e) = resp {
+        if e.is_timeout() {
+            log::error!("Request to server timed out...: {}", e.to_string());
+        }
+
+        return Err(Box::new(e));
+    }
+
+    let resp = resp.unwrap();
+
     let status = resp.status();
     let is_success = status.is_success();
 
