@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::Row;
 
 use crate::storage;
+use crate::Error;
 
 pub enum LogLevel {
     Debug,
@@ -36,6 +37,70 @@ pub struct Address {
     pub storage_backend: storage::Backend,
     pub storage_path: String,
     pub last_renewal_time: DateTime<Utc>,
+}
+
+impl Address {
+    const TABLE_NAME: &'static str = "addresses";
+
+    /// Validates sender address by checking that it is in the list of
+    /// whitelisted senders for this recipient.
+    pub async fn validate_sender(
+        &self,
+        email: &Email,
+        db_client: &mut Client<'_>,
+    ) -> Result<bool, Error> {
+        let sender = &email.sender;
+        let recipient = &self.address;
+
+        let query = format!(
+            "SELECT is_active FROM {} WHERE ($1 = ANY (whitelist) OR is_whitelist_enabled = false)
+            AND address = $2",
+            Self::TABLE_NAME
+        );
+
+        let row = sqlx::query(&query)
+            .bind(sender)
+            .bind(recipient)
+            .fetch_optional(db_client.db)
+            .await?;
+
+        if row.is_none() {
+            let msg = format!(
+                "Rejecting email {} (Message-ID: {}): sender {} is not on {} whitelist",
+                &email.uuid,
+                &email.message_id.as_ref().unwrap_or(&"N/A".to_string()),
+                sender,
+                recipient
+            );
+            log::warn!("{}", msg);
+
+            // Do not log this against email as email might not have
+            // been inserted yet
+            db_client.log(&msg, None, LogLevel::Warning).await;
+
+            Ok(false)
+        } else {
+            Ok(true)
+        }
+    }
+
+    /// Update address received email count
+    pub async fn update_received_count(&self, db_client: &mut Client<'_>) -> Result<(), Error> {
+        let query = format!(
+            "
+            UPDATE {}
+            SET received = received + 1
+            WHERE address = $1",
+            Self::TABLE_NAME
+        );
+
+        let _num_rows = sqlx::query(&query)
+            .bind(&self.address)
+            .execute(db_client.db)
+            .await?;
+
+        Ok(())
+    }
 }
 
 /// Abstraction over sqlx DB client for Vaulty DB
@@ -115,70 +180,6 @@ impl<'a> Client<'a> {
         } else {
             // If no rows returned, none of the recipients are valid
             Ok(None)
-        }
-    }
-
-    /// Update address mail received count
-    pub async fn update_address_received_count(
-        &mut self,
-        address: &Address,
-    ) -> Result<(), sqlx::Error> {
-        // For now, just increment the received count
-        let query = format!(
-            "
-            UPDATE {}
-            SET received = received + 1
-            WHERE address = $1",
-            &self.address_table
-        );
-
-        let _num_rows = sqlx::query(&query)
-            .bind(&address.address)
-            .execute(self.db)
-            .await?;
-
-        Ok(())
-    }
-
-    /// Validates sender address by checking that it is in the list of
-    /// whitelisted senders for this recipient.
-    pub async fn validate_sender_address(
-        &mut self,
-        address: &Address,
-        email: &Email,
-    ) -> Result<bool, sqlx::Error> {
-        let sender = &email.sender;
-        let recipient = &address.address;
-
-        let query = format!(
-            "SELECT is_active FROM {} WHERE ($1 = ANY (whitelist) OR is_whitelist_enabled = false)
-            AND address = $2",
-            &self.address_table
-        );
-
-        let row = sqlx::query(&query)
-            .bind(sender)
-            .bind(recipient)
-            .fetch_optional(self.db)
-            .await?;
-
-        if let None = row {
-            let msg = format!(
-                "Rejecting email {} (Message-ID: {}): sender {} is not on {} whitelist",
-                &email.uuid,
-                &email.message_id.as_ref().unwrap_or(&"N/A".to_string()),
-                sender,
-                recipient
-            );
-            log::warn!("{}", msg);
-
-            // Do not log this against email as email might not have
-            // been inserted
-            self.log(&msg, None, LogLevel::Warning).await;
-
-            Ok(false)
-        } else {
-            Ok(true)
         }
     }
 

@@ -72,7 +72,7 @@ pub mod postfix {
         // Ensure that sender address is whitelisted
         // We scope this to avoid compiler nags about dyn Error
         {
-            let valid = db_client.validate_sender_address(&address, &email).await;
+            let valid = address.validate_sender(&email, &mut db_client).await;
             if let Err(e) = valid {
                 let msg = e.to_string();
                 log::error!("{}", msg);
@@ -131,7 +131,7 @@ pub mod postfix {
         // Increment received email count for this address
         // If this fails, do not proceed with processing this email
         // TODO: Can we do this in a single transaction (merge with above)?
-        if let Err(e) = db_client.update_address_received_count(&address).await {
+        if let Err(e) = address.update_received_count(&mut db_client).await {
             let msg = e.to_string();
             log::error!("{}", msg);
             return Err(warp::reject::custom(Error::from(e)));
