@@ -93,5 +93,5 @@ INSERT INTO logs (email_id, msg, log_level) VALUES
     ('00000000-0000-0000-0000-000000000000', 'HELLO THERE 3!', 1);
 
 INSERT INTO aliases (alias, dest) VALUES
-    ('postmaster@vaulty.net', 'vmail'),
-    ('support@vaulty.net', 'vmail');
+    ('postmaster@vaulty.net', 'vmail@localhost'),
+    ('support@vaulty.net', 'vmail@localhost');

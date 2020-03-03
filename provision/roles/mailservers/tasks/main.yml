@@ -11,8 +11,9 @@
 - name: Create mail user and assign to group
   user:
     name: "{{ mail_user }}"
+    password: "{{ mail_pass }}"
     uid: "{{ mail_uid }}"
-    groups: "sudo,{{ mail_group }}"
+    groups: "{{ mail_group }}"
     home: "{{ mail_dir }}"
     create_home: true
     state: present
@@ -31,6 +32,37 @@
   apt:
     name: postfix-policyd-spf-python
     state: present
+- name: Install Cyrus for SASL
+  apt:
+    name: sasl2-bin
+    state: present
+- name: Copy main SASL startup config
+  copy:
+    src: ../files/sasl/saslauthd
+    dest: /etc/default/saslauthd
+- name: Copy SASL config for DB auth
+  copy:
+    src: ../files/sasl/smtpd.conf
+    dest: /usr/lib/sasl2/smtpd.conf
+- name: Add "postfix" user to SASL group
+  user:
+    name: postfix
+    groups:
+      - sasl
+    append: true
+- name: Adjust UNIX socket permissions to allow Postfix access
+  file:
+    path: /var/run/saslauthd/
+    mode: g+rx
+
+# NOTE: You still need to create the SASL auth DB and add users
+# You can do that with this command:
+# saslpasswd2 -c -u example.net test
+# >>> enter password
+# Login with: test@example.net
+# To test:
+# testsaslauthd -u "test" -r example.net -p "test"
+
 - name: Build "vaulty-filter" and "vaulty-server" (release)
   local_action:
     module: shell
@@ -98,6 +130,10 @@
     mode: u=rw,g=r,o=r
 - name: Reload Postfix configs
   shell: postfix reload
+- name: Restart SASL
+  systemd:
+    name: saslauthd
+    state: restarted
 - name: Copy "vaulty_server" systemd unit
   copy:
     src: ../files/vaulty.service

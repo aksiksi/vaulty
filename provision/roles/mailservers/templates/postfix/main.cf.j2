@@ -12,31 +12,52 @@ append_dot_mydomain = no
 
 readme_directory = no
 
+# Trusted CA certs
+smtp_tls_CApath = /etc/ssl/certs
+smtpd_tls_CApath = /etc/ssl/certs
+
+# SMTP server config
 # TLS parameters (LetsEncrypt for certs)
 smtpd_tls_cert_file=/etc/letsencrypt/live/{{ inventory_hostname }}/fullchain.pem
 smtpd_tls_key_file=/etc/letsencrypt/live/{{ inventory_hostname }}/privkey.pem
 smtpd_use_tls=yes
 smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
-smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
-smtp_tls_security_level = may
 smtpd_tls_security_level = may
-smtp_tls_note_starttls_offer = yes
 smtpd_tls_loglevel = 1
 smtpd_tls_received_header = yes
 
+# SASL security options
+smtpd_sasl_security_options = noanonymous, noplaintext
+smtpd_sasl_tls_security_options = noanonymous
+
+# SMTP client config
+smtp_tls_note_starttls_offer = yes
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+smtp_tls_security_level = may
+smtp_tls_chain_files =
+    /etc/letsencrypt/live/{{ inventory_hostname }}/privkey.pem,
+    /etc/letsencrypt/live/{{ inventory_hostname }}/fullchain.pem
+smtp_tls_loglevel = 1
+
+# Mailserver's main domain
 mydomain = {{ vaulty_domain }}
 
-# If this is set to $mydomain, local mail will come from @domain.com
-# For smaller sites, disabling this is preferred
-# myorigin = $mydomain
+# Sending emails will append @domain.net
+myorigin = $mydomain
 
-myhostname = {{ ansible_hostname }}
-mydestination = $myhostname, localhost.$mydomain, localhost.localdomain, localhost
+# FQDN for this machine; this is how it is uniquely identified with other
+# servers
+myhostname = {{ inventory_hostname }}
+
+# List of non-virtual destinations to accept mail for
+mydestination = localhost.$mydomain, localhost.localdomain, localhost
 mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128 172.0.0.0/8 192.168.0.0/16
 relayhost =
 recipient_delimiter = +
 inet_interfaces = all
-default_transport = error
+
+# This is the default
+default_transport = smtp
 relay_transport = error
 
 # Local user mailbox size = 500 MB
@@ -53,7 +74,7 @@ export_environment = {{ postfix_env }}
 
 # Virtual transport and mailbox config
 virtual_transport = vaulty_filter:
-virtual_mailbox_domains = $mydomain, mail.$mydomain, {{ inventory_hostname }}
+virtual_mailbox_domains = $mydomain, mail.$mydomain, $myhostname
 virtual_mailbox_base = {{ mail_dir }}
 virtual_mailbox_maps = pgsql:/etc/postfix/pgsql-vmail.cf
 virtual_alias_maps = pgsql:/etc/postfix/pgsql-valiases.cf
