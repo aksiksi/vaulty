@@ -3,18 +3,26 @@
   apt:
     name: python3
     state: present
+  tags:
+    - test
 - name: Install pip
   apt:
     name: python3-pip
     state: present
+  tags:
+    - test
 - name: Install venv
   apt:
     name: python3-venv
     state: present
+  tags:
+    - test
 - name: Create group
   group:
     name: "{{ vaulty_web_group }}"
     state: present
+  tags:
+    - test
 - name: Create user
   user:
     name: "{{ vaulty_web_user }}"
@@ -22,10 +30,15 @@
     create_home: true
     shell: /bin/bash
     state: present
+  tags:
+    - test
 - name: Pull vaulty repo
   git:
     repo: "{{ vaulty_repo }}"
     dest: "{{ vaulty_web_repo_path }}"
+  tags:
+    - test
+    - update
 - name: Change repo ownership
   file:
     path: "{{ vaulty_web_repo_path }}"
@@ -34,13 +47,20 @@
     owner: "{{ vaulty_web_user }}"
     group: "{{ vaulty_web_group }}"
     recurse: yes
+  tags:
+    - test
 - name: Create virtualenv
   become: yes
   become_user: "{{ vaulty_web_user }}"
   command:
     cmd: python3 -m venv "{{ vaulty_web_venv_path }}"
     creates: "{{ vaulty_web_venv_path }}"
+  tags:
+    - test
 - name: Install Python packages
   pip:
     requirements: "{{ vaulty_web_code_path }}/requirements.txt"
     virtualenv: "{{ vaulty_web_venv_path }}"
+  tags:
+    - test
+    - update

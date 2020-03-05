@@ -40,10 +40,14 @@
   copy:
     src: ../files/sasl/saslauthd
     dest: /etc/default/saslauthd
+  tags:
+    - update
 - name: Copy SASL config for DB auth
   copy:
     src: ../files/sasl/smtpd.conf
     dest: /usr/lib/sasl2/smtpd.conf
+  tags:
+    - update
 - name: Add "postfix" user to SASL group
   user:
     name: postfix
@@ -68,16 +72,25 @@
     module: shell
     cmd: cargo build --release
     chdir: ../vaulty-mail
+  tags:
+    - test
+    - update
 - name: Copy "vaulty_server" to "/usr/bin"
   copy:
     src: ../vaulty-mail/target/release/vaulty_server
     dest: /usr/bin
     mode: u=rwx,g=rwx,o=rwx
+  tags:
+    - test
+    - update
 - name: Copy "vaulty_filter" to "/usr/bin"
   copy:
     src: ../vaulty-mail/target/release/vaulty_filter
     dest: /usr/bin
     mode: u=rwx,g=rwx,o=rwx
+  tags:
+    - test
+    - update
 - name: Install certbot
   apt:
     name: certbot
@@ -107,51 +120,75 @@
   loop:
     - ../files/postfix/master.cf
     - ../files/postfix/virtual
+  tags:
+    - update
 - name: Template Postfix "main.cf"
   template:
     src: ../templates/postfix/main.cf.j2
     dest: /etc/postfix/main.cf
-    owner: vmail
-    group: vmail
+    owner: "{{ mail_user }}"
+    group: "{{ mail_group }}"
     mode: u=rw,g=r,o=r
+  tags:
+    - update
 - name: Template Postfix PGSQL virtual mapping file
   template:
     src: ../templates/postfix/pgsql-vmail.cf.j2
     dest: /etc/postfix/pgsql-vmail.cf
-    owner: vmail
-    group: vmail
+    owner: "{{ mail_user }}"
+    group: "{{ mail_group }}"
     mode: u=rw,g=r,o=r
+  tags:
+    - update
 - name: Template Postfix PGSQL virtual aliases file
   template:
     src: ../templates/postfix/pgsql-valiases.cf.j2
     dest: /etc/postfix/pgsql-valiases.cf
-    owner: vmail
-    group: vmail
+    owner: "{{ mail_user }}"
+    group: "{{ mail_group }}"
     mode: u=rw,g=r,o=r
+  tags:
+    - update
 - name: Reload Postfix configs
   shell: postfix reload
+  tags:
+    - update
 - name: Restart SASL
   systemd:
     name: saslauthd
     state: restarted
+  tags:
+    - update
 - name: Copy "vaulty_server" systemd unit
   copy:
     src: ../files/vaulty.service
     dest: /etc/systemd/system/
+  tags:
+    - test
+    - update
 - name: Copy "vaulty_server" env file
   copy:
     src: ../files/vaulty.env
     dest: /etc/vaulty/
+  tags:
+    - test
+    - update
 - name: Template "vaulty_server" config file
   template:
     src: ../templates/vaulty.toml.j2
     dest: /etc/vaulty/vaulty.toml
-    owner: vmail
-    group: vmail
+    owner: "{{ mail_user }}"
+    group: "{{ mail_group }}"
     mode: u=rw,g=r,o=r
+  tags:
+    - test
+    - update
 - name: Enable and start vaulty service
   systemd:
     state: restarted
     daemon_reload: yes
     enabled: yes
     name: vaulty
+  tags:
+    - test
+    - update
