@@ -8,7 +8,5 @@ steps:
 - script: |
     cd vaulty-mail
     cargo build
-    cargo test
+    DROPBOX_TOKEN=$(DROPBOX_TOKEN) cargo test
   displayName: 'Build vaulty and run tests'
-  env:
-    DROPBOX_TOKEN: $(DROPBOX_TOKEN)
