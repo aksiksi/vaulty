@@ -1,0 +1,12 @@
+trigger:
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- script: |
+    cd vaulty-mail
+    cargo build
+    cargo test
+  displayName: 'Build vaulty and run tests'
