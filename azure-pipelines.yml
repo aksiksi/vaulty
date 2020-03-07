@@ -10,3 +10,5 @@ steps:
     cargo build
     cargo test
   displayName: 'Build vaulty and run tests'
+  env:
+    DROPBOX_TOKEN: $(DROPBOX_TOKEN)
