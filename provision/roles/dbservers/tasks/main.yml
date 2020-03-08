@@ -9,6 +9,10 @@
       - python-psycopg2
   tags:
     - test
+- name: Add Postgres UFW rule
+  ufw:
+    rule: allow
+    port: postgresql
 - name: Ensure the PostgreSQL service is running
   service:
     name: postgresql

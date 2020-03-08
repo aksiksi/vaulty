@@ -3,6 +3,14 @@
   apt:
     name: postfix
     state: present
+- name: Add SMTP UFW rule
+  ufw:
+    rule: allow
+    port: smtp
+- name: Add SMTP submission UFW rule
+  ufw:
+    rule: allow
+    port: submission
 - name: Set machine hostname
   hostname:
     name: "{{ inventory_hostname }}"

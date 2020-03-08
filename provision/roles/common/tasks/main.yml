@@ -7,6 +7,10 @@
   apt:
     name: rsync
     state: present
+- name: Install UFW
+  apt:
+    name: ufw
+    state: present
 - name: Copy basic SSH config
   copy:
     src: ../files/sshd_config
@@ -29,3 +33,20 @@
   service:
     name: fail2ban
     state: reloaded
+# Common firewall rules across all machines
+- name: Allow HTTP
+  ufw:
+    rule: allow
+    port: http
+- name: Allow HTTPS
+  ufw:
+    rule: allow
+    port: https
+- name: Allow SSH
+  ufw:
+    rule: allow
+    port: ssh
+- name: Enable UFW
+  ufw:
+    state: enabled
+    policy: reject

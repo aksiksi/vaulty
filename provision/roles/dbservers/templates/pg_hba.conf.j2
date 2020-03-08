@@ -98,11 +98,7 @@ local   replication     all                                     peer
 host    replication     all             127.0.0.1/32            md5
 host    replication     all             ::1/128                 md5
 
-# Allow trusted remote connections to DB user from all mail and web servers
-{% for host in groups['mailservers'] %}
-host    all             {{ vaulty_db_user }}          {{ hostvars[host].ansible_host }}/32              trust
-{% endfor %}
-
-{% for host in groups['webservers'] %}
-host    all             {{ vaulty_db_user }}          {{ hostvars[host].ansible_host }}/32              trust
-{% endfor %}
+# Allow trusted remote connections to DB user from all Vaulty servers
+# NOTE: Prepending a "." matches example.com AND *.example.com
+# See: https://www.postgresql.org/docs/10/auth-pg-hba-conf.html
+host    all     {{ vaulty_db_user }}   .{{ vaulty_domain }}     trust
