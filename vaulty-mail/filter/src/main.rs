@@ -10,7 +10,9 @@ use reqwest::StatusCode;
 
 use structopt::StructOpt;
 
-mod mail;
+mod error;
+
+use error::Error;
 
 // TODO: Can we make this more flexible?
 lazy_static! {
@@ -39,7 +41,7 @@ async fn send_attachment(
     client: &reqwest::Client,
     email: &vaulty::email::Email,
     attachment: vaulty::email::Attachment,
-) -> Result<(), mail::Error> {
+) -> Result<(), Error> {
     log::info!(
         "Processing attachment for email: {}",
         attachment.get_email_id().to_string()
@@ -65,7 +67,7 @@ async fn send_attachment(
             log::error!("Request to server timed out...: {}", e.to_string());
         }
 
-        return Err(mail::Error::Unexpected);
+        return Err(Error::Unexpected);
     }
 
     let resp = resp.unwrap();
@@ -78,7 +80,7 @@ async fn send_attachment(
 }
 
 /// Transmit this email to the Vaulty processing server
-async fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(), mail::Error> {
+async fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(), Error> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(REQUEST_TIMEOUT))
         .build()
@@ -97,7 +99,7 @@ async fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(
             log::error!("Request to server timed out...: {}", e.to_string());
         }
 
-        return Err(mail::Error::Unexpected);
+        return Err(Error::Unexpected);
     }
 
     let resp = resp.unwrap();
@@ -112,11 +114,11 @@ async fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(
         if status == StatusCode::UNPROCESSABLE_ENTITY {
             // Reject the email gracefully
             log::info!("{}", body);
-            return Err(mail::Error::Server(body.to_string()));
+            return Err(Error::Server(body.to_string()));
         } else {
             // Unexpected server error
             log::error!("Failed to process email {} with: \"{}\"", mail.uuid, body);
-            return Err(mail::Error::Unexpected);
+            return Err(Error::Unexpected);
         }
     }
 
@@ -164,7 +166,7 @@ async fn main() {
     // Process this email
     // If an error is encountered, we send a reply to the user
     match process(&remote_addr, &mut mail).await {
-        Err(e) => mail::reply_with_error(&mail, e),
+        Err(e) => error::reply_with_error(&mail, e),
         Ok(_) => (),
     }
 }
