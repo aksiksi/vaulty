@@ -76,7 +76,7 @@
 - name: Copy DB schema (as a template)
   template:
     src: ../vaulty-db/schema.sql
-    dest: /etc/vaulty/
+    dest: "{{ vaulty_config_path }}/schema.sql"
     mode: u=rw,g=rw,o=r
   tags:
     - test
@@ -93,7 +93,7 @@
 - name: Apply schema
   become: yes
   become_user: postgres
-  shell: psql -d {{ vaulty_db_name }} -U {{ vaulty_db_user }} -f /etc/vaulty/schema.sql
+  shell: psql -d {{ vaulty_db_name }} -U {{ vaulty_db_user }} -f "{{ vaulty_config_path }}/schema.sql"
   tags:
     - test
     - update

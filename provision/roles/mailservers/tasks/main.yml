@@ -172,14 +172,14 @@
 - name: Copy "vaulty_server" env file
   copy:
     src: ../files/vaulty.env
-    dest: /etc/vaulty/
+    dest: "{{ vaulty_config_path }}"
   tags:
     - test
     - update
 - name: Template "vaulty_server" config file
   template:
     src: ../templates/vaulty.toml.j2
-    dest: /etc/vaulty/vaulty.toml
+    dest: "{{ vaulty_config_path }}/vaulty.toml"
     owner: "{{ mail_user }}"
     group: "{{ mail_group }}"
     mode: u=rw,g=r,o=r
