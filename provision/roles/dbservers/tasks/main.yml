@@ -7,11 +7,15 @@
       - postgresql-contrib-11
       - libpq-dev
       - python-psycopg2
+  tags:
+    - test
 - name: Ensure the PostgreSQL service is running
   service:
     name: postgresql
     state: started
     enabled: yes
+  tags:
+    - test
 - name: Copy "postgres.conf"
   copy:
     src: ../files/postgresql.conf
@@ -19,6 +23,9 @@
     owner: postgres
     group: postgres
     mode: u=rw,g=r,o=r
+  tags:
+    - test
+    - update
 - name: Template "pg_hba.conf" to allow remote connections
   template:
     src: ../templates/pg_hba.conf.j2
@@ -26,10 +33,16 @@
     owner: postgres
     group: postgres
     mode: u=rw,g=r,o=r
+  tags:
+    - test
+    - update
 - name: Reload Postgres
   service:
     name: postgresql
     state: reloaded
+  tags:
+    - test
+    - update
 - name: Create DB user and set password
   become: yes
   become_user: postgres
@@ -37,6 +50,8 @@
     name: "{{ vaulty_db_user }}"
     password: "{{ vaulty_db_password }}"
     expires: infinity
+  tags:
+    - test
 - name: Create DB
   become: yes
   become_user: postgres
@@ -46,6 +61,8 @@
     encoding: UTF-8
     lc_collate: en_US.UTF-8
     lc_ctype: en_US.UTF-8
+  tags:
+    - test
 - name: Adjust DB user privileges
   become: yes
   become_user: postgres
@@ -54,30 +71,29 @@
     name: "{{ vaulty_db_user }}"
     priv: "CONNECT"
     role_attr_flags: NOSUPERUSER,NOCREATEDB
-- name: Copy DB schema (as a template)
   tags:
-    - update
+    - test
+- name: Copy DB schema (as a template)
   template:
     src: ../vaulty-db/schema.sql
     dest: /etc/vaulty/
     mode: u=rw,g=rw,o=r
-- name: Copy DB schema locally
   tags:
+    - test
     - update
+- name: Copy DB schema locally
   template:
     src: ../vaulty-db/schema.sql
     dest: /tmp/
     mode: u=rw,g=rw,o=r
   delegate_to: localhost
-- name: Apply schema
   tags:
+    - test
     - update
+- name: Apply schema
   become: yes
   become_user: postgres
   shell: psql -d {{ vaulty_db_name }} -U {{ vaulty_db_user }} -f /etc/vaulty/schema.sql
-- name: Pull vaulty repo
   tags:
+    - test
     - update
-  git:
-    repo: 'https://github.com/aksiksi/vaulty.git'
-    dest: /var/www/vaulty

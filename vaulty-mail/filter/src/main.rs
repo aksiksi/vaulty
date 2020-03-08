@@ -10,6 +10,8 @@ use reqwest::StatusCode;
 
 use structopt::StructOpt;
 
+mod mail;
+
 // TODO: Can we make this more flexible?
 lazy_static! {
     static ref VAULTY_USER: String = env::var("VAULTY_USER").expect("No auth username found!");
@@ -37,7 +39,7 @@ async fn send_attachment(
     client: &reqwest::Client,
     email: &vaulty::email::Email,
     attachment: vaulty::email::Attachment,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), mail::Error> {
     log::info!(
         "Processing attachment for email: {}",
         attachment.get_email_id().to_string()
@@ -63,7 +65,7 @@ async fn send_attachment(
             log::error!("Request to server timed out...: {}", e.to_string());
         }
 
-        return Err(Box::new(e));
+        return Err(mail::Error::Unexpected);
     }
 
     let resp = resp.unwrap();
@@ -76,10 +78,7 @@ async fn send_attachment(
 }
 
 /// Transmit this email to the Vaulty processing server
-async fn process(
-    remote_addr: &str,
-    mut mail: vaulty::email::Email,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(), mail::Error> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(REQUEST_TIMEOUT))
         .build()
@@ -98,7 +97,7 @@ async fn process(
             log::error!("Request to server timed out...: {}", e.to_string());
         }
 
-        return Err(Box::new(e));
+        return Err(mail::Error::Unexpected);
     }
 
     let resp = resp.unwrap();
@@ -109,14 +108,15 @@ async fn process(
     let body = &resp.text().await?;
 
     if !is_success {
+        // TODO: Handle all possible error codes
         if status == StatusCode::UNPROCESSABLE_ENTITY {
-            // None of the listed recipients are valid
             // Reject the email gracefully
             log::info!("{}", body);
-            return Ok(());
+            return Err(mail::Error::Server(body.to_string()));
         } else {
+            // Unexpected server error
             log::error!("Failed to process email {} with: \"{}\"", mail.uuid, body);
-            return Err("Failed to process email".into());
+            return Err(mail::Error::Unexpected);
         }
     }
 
@@ -156,10 +156,15 @@ async fn main() {
         .expect("Failed to read email body from stdin!");
 
     // Parse and process email
-    let mail = vaulty::email::Email::from_mime(email_content.as_bytes())
+    let mut mail = vaulty::email::Email::from_mime(email_content.as_bytes())
         .unwrap()
         .with_sender(opt.sender)
         .with_recipients(opt.recipients);
 
-    process(&remote_addr, mail).await.unwrap();
+    // Process this email
+    // If an error is encountered, we send a reply to the user
+    match process(&remote_addr, &mut mail).await {
+        Err(e) => mail::reply_with_error(&mail, e),
+        Ok(_) => (),
+    }
 }

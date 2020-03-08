@@ -63,11 +63,16 @@ pub mod postfix {
                 log::warn!("{}", msg);
                 db_client.log(&msg, None, LogLevel::Warning).await;
 
-                let err = Error::RejectedEmail(msg);
+                let err = Error::InvalidRecipient;
                 return Err(warp::reject::custom(err));
             }
             Some(a) => a,
         };
+
+        // Update the email to just have the valid recipient address
+        // found above
+        let recipient = &address.address;
+        email.recipients.retain(|r| r == recipient);
 
         // Ensure that sender address is whitelisted
         // We scope this to avoid compiler nags about dyn Error
@@ -82,16 +87,17 @@ pub mod postfix {
             if !valid.unwrap() {
                 // Sender is not on the whitelist
                 // Fail gracefully...
-                let msg = "Rejecting email due to non-whitelisted sender".to_string();
-                let err = Error::RejectedEmail(msg);
+                log::warn!(
+                    "Rejecting email {:?} due to non-whitelisted sender",
+                    email.message_id
+                );
+
+                let err = Error::SenderNotWhitelisted {
+                    recipient: recipient.to_string(),
+                };
                 return Err(warp::reject::custom(err));
             }
         }
-
-        // Update the email to just have the valid recipient address
-        // found above
-        let recipient = &address.address;
-        email.recipients.retain(|r| r == recipient);
 
         // Insert this email into DB
         if let Err(e) = db_client.insert_email(&email).await {
@@ -101,19 +107,23 @@ pub mod postfix {
         }
 
         // Verify that address quota is not exceeded with this email
-        let max_email_size = address.max_email_size as usize;
-        let is_mail_size_exceeded = email.size > max_email_size;
+        let max_email_size = address.max_email_size as f32;
+        let is_mail_size_exceeded = email.size as f32 > max_email_size;
         let is_quota_exceeded = (address.received + 1) > address.quota;
         let reject = is_quota_exceeded || is_mail_size_exceeded;
 
         if reject {
             let msg = if is_mail_size_exceeded {
                 format!(
-                    "Email {} is larger than allowed for this address: {}",
-                    &email.uuid, recipient
+                    "This email is larger than allowed for {}: maximum email size is {:.2} MB.",
+                    recipient,
+                    max_email_size / 1e6
                 )
             } else {
-                format!("Address {} has hit its quota for this period", recipient)
+                format!(
+                    "Address {} has hit its quota of {} emails for this period.",
+                    recipient, address.quota,
+                )
             };
 
             log::warn!("{}", msg);
@@ -124,7 +134,7 @@ pub mod postfix {
 
             db_client.update_email(&email, false, Some(&msg)).await;
 
-            let err = Error::RejectedEmail(msg);
+            let err = Error::QuotaExceeded(msg);
             return Err(warp::reject::custom(err));
         }
 
