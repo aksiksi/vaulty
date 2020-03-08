@@ -71,30 +71,18 @@
   tags:
     - test
     - update
-- name: Create a directory if it does not exist
-  file:
-    path: "{{ vaulty_config_path }}/secrets"
-    state: directory
-    mode: '0755'
-- name: Template DigitalOcean token file
-  template:
-    src: ../templates/certbot.ini
-    dest: "{{ vaulty_config_path }}/secrets/certbot.ini"
-    mode: 600
 - name: Install certbot
   apt:
     name: certbot
     state: present
-- name: Install certbot DigitalOcean plugin
+- name: Install certbot Nginx plugin
   apt:
-    name: python-certbot-dns-digitalocean
+    name: python-certbot-nginx
+    state: present
 - name: Configure and enable certbot
   shell: |
-    certbot certonly \
-        --dns-digitalocean \
-        --dns-digitalocean-credentials "{{ vaulty_config_path }}/secrets/certbot.ini" \
-        -d "{{ vaulty_domain }}" \
-        -d "web.{{ vaulty_domain }}"
+    certbot --nginx -d "{{ vaulty_domain }}" -d "web.{{ vaulty_domain }}" --noninteractive --agree-tos -m "{{ vaulty_postmaster }}"
+
   args:
     creates: "/etc/letsencrypt/live/{{ vaulty_domain }}/fullchain.pem"
 - name: Create crontab to renew certs
