@@ -3,6 +3,9 @@
   apt:
     name: postfix
     state: present
+- name: Set machine hostname
+  hostname:
+    name: "{{ inventory_hostname }}"
 - name: Ensure mail group exists
   group:
     name: "{{ mail_group }}"
