@@ -19,8 +19,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'z4%y2t#e!l-&tb(2s*!u$@$zlw2@=*p)plb4(9#boqsz0@a&r4'
+SECRET_KEY = os.environ.get("VAULTY_DJANGO_SECRET_KEY",
+                            "z4%y2t#e!l-&tb(2s*!u$@$zlw2@=*p)plb4(9#boqsz0@a&r4")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'web',
 ]
 
 MIDDLEWARE = [
