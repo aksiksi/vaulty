@@ -4,42 +4,86 @@
   <head>
     <title>{% block title %}{% endblock %}</title>
     <link rel="shortcut icon" type="image/png" href="{% static 'favicon.ico' %}"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.js" integrity="sha256-WpOohJOqMqqyKL9FccASB9O0KwACQJpFTUBLTYOVvVU=" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.11/vue.js" integrity="sha256-NSuqgY2hCZJUN6hDMFfdxvkexI7+iLxXQbL540RQ/c4=" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.js" integrity="sha256-t8GepnyPmw9t+foMh3mKNvcorqNHamSKtKRxxpUEgFI=" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css" integrity="sha256-9mbkOfVho3ZPXfM7W8sV2SndrGDuh7wuyLjtsWeTI1Q=" crossorigin="anonymous" />
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/js/all.min.js" integrity="sha256-MAgcygDRahs+F/Nk5Vz387whB4kSK9NXlDN3w58LLq0=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.8.0/css/bulma.min.css" integrity="sha256-D9M5yrVDqFlla7nlELDaYZIpXfFWDytQtiV+TaH6F1I=" crossorigin="anonymous" />
   </head>
 
-<body>
-  <div class="ui attached stackable menu">
-    <div class="ui container">
-      <a class="item">
-        <i class="home icon"></i> Home
+<nav class="navbar" role="navigation" aria-label="main navigation">
+  <div class="navbar-brand">
+    <a class="navbar-item" href="/">
+      <img src="{% static 'header.png' %}" width="91" height="28">
+    </a>
+
+    <a role="button" class="navbar-burger burger" aria-label="menu" aria-expanded="false" data-target="vaulty-navbar">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </a>
+  </div>
+
+  <div id="vaulty-navbar" class="navbar-menu">
+    <div class="navbar-start">
+      <a class="navbar-item">
+        Home
       </a>
-      <a class="item">
-        <i class="grid layout icon"></i> Browse
+
+      <a class="navbar-item">
+        Pricing
       </a>
-      <a class="item">
-        <i class="mail icon"></i> Messages
+
+      <a class="navbar-item">
+        FAQ
       </a>
-      <div class="ui simple dropdown item">
-        More
-        <i class="dropdown icon"></i>
-        <div class="menu">
-          <a class="item"><i class="edit icon"></i> Edit Profile</a>
-          <a class="item"><i class="globe icon"></i> Choose Language</a>
-          <a class="item"><i class="settings icon"></i> Account Settings</a>
+
+      <div class="navbar-item has-dropdown is-hoverable">
+        <a class="navbar-link">
+          More
+        </a>
+
+        <div class="navbar-dropdown">
+          <a class="navbar-item">
+            About
+          </a>
+          <a class="navbar-item">
+            Contact
+          </a>
+          <hr class="navbar-divider">
+          <a class="navbar-item">
+            Report an issue
+          </a>
         </div>
       </div>
-      <div class="right item">
-        <div class="ui input"><input type="text" placeholder="Search..."></div>
+    </div>
+
+    <div class="navbar-end">
+      <div class="navbar-item">
+        <div class="buttons">
+          <a class="button is-primary">
+            <strong>Sign up</strong>
+          </a>
+          <a class="button is-light">
+            Log in
+          </a>
+        </div>
       </div>
     </div>
   </div>
+</nav>
 
-  <div id="content">
-      {% block content %}{% endblock %}
-  </div>
+<body>
+  {% block content %}{% endblock %}
 </body>
+
+<footer class="footer">
+  <div class="content has-text-centered">
+    <p>
+      <strong>Vaulty</strong> by <a href="https://assil.me">Assil Ksiksi</a>
+    </p>
+  </div>
+</footer>
+
 </html>

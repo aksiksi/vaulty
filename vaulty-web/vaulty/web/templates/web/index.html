@@ -3,30 +3,88 @@
 {% block title %}Home | Vaulty{% endblock %}
 
 {% block content %}
-<div class="ui text container">
-  <h1>Welcome to Vaulty!</h1>
-</div>
-<div class="ui grid container">
-  <div class="row">
-    <div class="column">
-      <form class="ui form">
-        <div class="field">
-          <label>First Name</label>
-          <input type="text" name="first-name" placeholder="First Name">
+<section class="hero is-primary is-fullheight is-medium">
+  <div class="hero-body">
+    <div class="container">
+      <h1 class="title is-2" style="text-align: center;">Send email attachments directly into your cloud storage account.</h1>
+      <div class="columns is-centered">
+        <div class="column has-text-centered is-two-thirds">
+          <a href="#start" class="button is-warning is-large">
+            Get Started
+          </a>
         </div>
-        <div class="field">
-          <label>Last Name</label>
-          <input type="text" name="last-name" placeholder="Last Name">
-        </div>
-        <div class="field">
-          <div class="ui checkbox">
-            <input type="checkbox" tabindex="0" class="hidden">
-            <label>I agree to the Terms and Conditions</label>
-          </div>
-        </div>
-        <button class="ui button" type="submit">Submit</button>
-      </form>
+      </div>
     </div>
   </div>
-</div>
+</section>
+
+<section id="start" class="hero">
+  <div class="hero-body">
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-half">
+          <h1 class="title" style="text-align: center;">Getting Started is Simple:</h1>
+        </div>
+      </div>
+      <div class="columns">
+        <div class="column">
+          <p class="is-size-4">1. Signup for a custom email address</p>
+        </div>
+        <div class="column">
+          <p class="is-size-4">2. Link your Dropbox or GDrive account</p>
+        </div>
+        <div class="column">
+          <p class="is-size-4">3. Send an email to your new address!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h1 class="title has-text-centered">Keep Me Updated!</h1>
+    <div class="columns is-centered">
+      <div class="column is-two-thirds">
+        <form method="POST" action="/mailing-list">
+          {% csrf_token %}
+
+          <!-- Define a horizontal form consisting of two fields -->
+          <div class="field is-horizontal">
+            <div class="field-body">
+              {% for field in form %}
+                <div class="field">
+                  <p class="control has-icons-left has-icons-right is-expanded">
+                    {{ field.errors }}
+
+                    {{ field }}
+                    <span class="icon is-small is-left">
+                      <i class="fas fa-envelope"></i>
+                    </span>
+
+                    <!-- TODO: Toggle this if email check passes -->
+                    <span class="icon is-small is-right">
+                      <i class="fas fa-check"></i>
+                    </span>
+
+                    {% if field.help_text %}
+                    <p class="help">{{ field.help_text|safe }}</p>
+                    {% endif %}
+                  </p>
+                </div>
+              {% endfor %}
+                <p class="control">
+                  <button class="button is-success is-medium">
+                    Update Me!
+                  </button>
+                </p>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
 {% endblock %}
