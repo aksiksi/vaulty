@@ -5,14 +5,16 @@ use futures::stream::Stream;
 use reqwest::header::CONTENT_TYPE;
 
 use super::api;
+
+use crate::storage::client::{Client, ClientEmptyFuture};
 use crate::storage::Error;
 
-pub struct Client<'a> {
+pub struct DropboxClient<'a> {
     token: &'a str,
     client: reqwest::Client,
 }
 
-impl<'a> Client<'a> {
+impl<'a> DropboxClient<'a> {
     pub fn from_token(token: &'a str) -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(api::DROPBOX_REQUEST_TIMEOUT))
@@ -85,38 +87,42 @@ impl<'a> Client<'a> {
         Ok(())
     }
 
-    /// Upload a file to a user's Dropbox
-    /// This function does not return any API metadata
-    pub async fn upload_stream(
-        &self,
-        path: &str,
-        data: impl Stream<Item = Result<Bytes, crate::Error>> + Send + Sync + 'static,
-    ) -> Result<(), Error> {
-        // Auto-rename the attachment if it exists
-        let args = serde_json::json!({"path": path, "autorename": true}).to_string();
-        let url = api::build_endpoint_url(api::Endpoint::FileUpload);
-
-        let mut req = self
-            .client
-            .post(reqwest::Url::parse(&url)?)
-            .bearer_auth(&self.token)
-            .header(CONTENT_TYPE, "application/octet-stream")
-            .body(reqwest::Body::wrap_stream(data));
-
-        req = req.header(api::DROPBOX_ARG_HEADER, args);
-
-        // Map response into an error if applicable
-        let _resp = api::map_status(req.send().await?)?.bytes().await?;
-
-        Ok(())
-    }
-
     pub async fn search(&self, path: &str, query: &str) -> Result<api::SearchResult, Error> {
         let data = serde_json::json!({"path": path, "query": query}).to_string();
         let resp = self
             .request(api::Endpoint::Search, data.into(), None, None)
             .await?;
         serde_json::from_slice(&resp).map_err(|e| e.into())
+    }
+}
+
+impl<'a> Client for DropboxClient<'a> {
+    /// Upload a file to a user's Dropbox
+    /// This function does not return any API metadata
+    fn upload_stream(
+        &self,
+        path: &str,
+        data: impl Stream<Item = Result<Bytes, crate::Error>> + Send + Sync + 'static,
+    ) -> ClientEmptyFuture<'_> {
+        // Auto-rename the attachment if it exists
+        let args = serde_json::json!({"path": path, "autorename": true}).to_string();
+        let url = api::build_endpoint_url(api::Endpoint::FileUpload);
+
+        Box::pin(async move {
+            let mut req = self
+                .client
+                .post(reqwest::Url::parse(&url)?)
+                .bearer_auth(&self.token)
+                .header(CONTENT_TYPE, "application/octet-stream")
+                .body(reqwest::Body::wrap_stream(data));
+
+            req = req.header(api::DROPBOX_ARG_HEADER, args);
+
+            // Map response into an error if applicable
+            let _resp = api::map_status(req.send().await?)?.bytes().await?;
+
+            Ok(())
+        })
     }
 }
 
@@ -127,7 +133,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_folder() {
         let token = std::env::var("DROPBOX_TOKEN").expect("No Dropbox token found");
-        let client = Client::from_token(&token);
+        let client = DropboxClient::from_token(&token);
 
         let result = client.list_folder("").await;
 
@@ -138,7 +144,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_folder() {
         let token = std::env::var("DROPBOX_TOKEN").expect("No Dropbox token found");
-        let client = Client::from_token(&token);
+        let client = DropboxClient::from_token(&token);
 
         let result = client.create_folder("/abcde").await;
 
@@ -148,7 +154,7 @@ mod tests {
     #[tokio::test]
     async fn test_file_upload() {
         let token = std::env::var("DROPBOX_TOKEN").expect("No Dropbox token found");
-        let client = Client::from_token(&token);
+        let client = DropboxClient::from_token(&token);
         let data = String::from("Hello there!").into_bytes();
 
         let result = client.upload("/vaulty_test.txt", data).await;
@@ -161,7 +167,7 @@ mod tests {
     /// /vaulty/search1 -> "test/", "test123/"
     async fn test_search_folders() {
         let token = std::env::var("DROPBOX_TOKEN").expect("No Dropbox token found");
-        let client = Client::from_token(&token);
+        let client = DropboxClient::from_token(&token);
 
         let result = client.search("/vaulty/search1", "test").await;
 
@@ -173,7 +179,7 @@ mod tests {
     /// /vaulty/search2 -> "test", "test123", "test/"
     async fn test_search_files_and_folders() {
         let token = std::env::var("DROPBOX_TOKEN").expect("No Dropbox token found");
-        let client = Client::from_token(&token);
+        let client = DropboxClient::from_token(&token);
 
         let result = client.search("/vaulty/search2", "test").await;
 

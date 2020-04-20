@@ -1,4 +1,5 @@
 mod backends;
+pub mod client;
 pub mod dropbox;
 mod error;
 

@@ -12,6 +12,8 @@ pub mod storage;
 mod error;
 pub use error::Error;
 
+use storage::client::Client;
+use storage::dropbox::client::DropboxClient;
 use storage::Backend;
 
 pub struct EmailHandler<'a> {
@@ -66,8 +68,7 @@ impl<'a> EmailHandler<'a> {
             match self.storage_backend {
                 Backend::Dropbox => {
                     // Build a Dropbox client
-                    let client = storage::dropbox::Client::from_token(self.storage_token);
-
+                    let client = DropboxClient::from_token(self.storage_token);
                     let result = client.upload_stream(&file_path, attachment).await;
 
                     result.map_err(|e| e.into())
