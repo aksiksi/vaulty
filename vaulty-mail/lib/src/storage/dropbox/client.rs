@@ -6,7 +6,7 @@ use reqwest::header::CONTENT_TYPE;
 
 use super::api;
 
-use crate::storage::client::{Client, ClientEmptyFuture};
+use crate::storage::client::{Client, ClientFuture};
 use crate::storage::Error;
 
 pub struct DropboxClient<'a> {
@@ -103,7 +103,7 @@ impl<'a> Client for DropboxClient<'a> {
         &self,
         path: &str,
         data: impl Stream<Item = Result<Bytes, crate::Error>> + Send + Sync + 'static,
-    ) -> ClientEmptyFuture<'_> {
+    ) -> ClientFuture<'_, ()> {
         // Auto-rename the attachment if it exists
         let args = serde_json::json!({"path": path, "autorename": true}).to_string();
         let url = api::build_endpoint_url(api::Endpoint::FileUpload);
