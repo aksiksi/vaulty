@@ -160,6 +160,12 @@
     mode: u=rw,g=r,o=r
   tags:
     - update
+- name: Start Postfix
+  systemd:
+    name: postfix
+    state: started
+  tags:
+    - update
 - name: Reload Postfix configs
   shell: postfix reload
   tags:

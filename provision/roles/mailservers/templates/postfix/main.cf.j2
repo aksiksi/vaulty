@@ -60,6 +60,13 @@ inet_interfaces = all
 default_transport = smtp
 relay_transport = error
 
+# Outgoing mail throttling
+# Rate at which emails can be sent to the same domain
+default_destination_rate_delay = 1s
+
+# Maximum number of outgoing message recipients
+default_destination_recipient_limit = 50
+
 # Local user mailbox size = 500 MB
 mailbox_size_limit = 500000000
 
