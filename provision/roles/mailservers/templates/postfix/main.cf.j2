@@ -29,6 +29,8 @@ smtpd_tls_received_header = yes
 # SASL security options
 smtpd_sasl_security_options = noanonymous, noplaintext
 smtpd_sasl_tls_security_options = noanonymous
+smtpd_tls_auth_only = yes
+smtpd_sasl_local_domain = $mydomain
 
 # SMTP client config
 smtp_tls_note_starttls_offer = yes
@@ -51,21 +53,15 @@ myhostname = {{ inventory_hostname }}
 
 # List of non-virtual destinations to accept mail for
 mydestination = localhost.$mydomain, localhost.localdomain, localhost
-mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128 172.0.0.0/8 192.168.0.0/16
+mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128 172.16.0.0/12 192.168.0.0/16
 relayhost =
+relay_domains =
 recipient_delimiter = +
 inet_interfaces = all
 
 # This is the default
 default_transport = smtp
 relay_transport = error
-
-# Outgoing mail throttling
-# Rate at which emails can be sent to the same domain
-default_destination_rate_delay = 1s
-
-# Maximum number of outgoing message recipients
-default_destination_recipient_limit = 50
 
 # Local user mailbox size = 500 MB
 mailbox_size_limit = 500000000
@@ -95,6 +91,7 @@ smtpd_relay_restrictions =
     defer_unauth_destination
 
 smtpd_recipient_restrictions =
+    permit_mynetworks,
     permit_sasl_authenticated,
     reject_invalid_hostname,
     reject_non_fqdn_hostname,
@@ -102,7 +99,7 @@ smtpd_recipient_restrictions =
     reject_non_fqdn_recipient,
     reject_unknown_sender_domain,
     reject_unknown_recipient_domain,
-    permit_mynetworks,
+    reject_unlisted_recipient,
     reject_unauth_destination,
     check_policy_service unix:private/policy-spf,
     reject_rbl_client sbl.spamhaus.org,
@@ -120,3 +117,5 @@ smtpd_helo_restrictions =
 smtpd_error_sleep_time = 1s
 smtpd_soft_error_limit = 10
 smtpd_hard_error_limit = 20
+
+policy-spf_time_limit = 3600s
