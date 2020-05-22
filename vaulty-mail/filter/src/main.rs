@@ -2,8 +2,6 @@ use std::env;
 use std::io::Read;
 use std::time::Duration;
 
-use futures::stream::{FuturesUnordered, StreamExt};
-
 use lazy_static::lazy_static;
 
 use reqwest::StatusCode;
@@ -36,9 +34,9 @@ struct Opt {
     recipients: Vec<String>,
 }
 
-async fn send_attachment(
+fn send_attachment(
     remote_addr: &str,
-    client: &reqwest::Client,
+    client: &reqwest::blocking::Client,
     email: &vaulty::email::Email,
     attachment: vaulty::email::Attachment,
 ) -> Result<(), Error> {
@@ -59,9 +57,9 @@ async fn send_attachment(
             attachment.get_name(),
         )
         .basic_auth(VAULTY_USER.as_str(), Some(VAULTY_PASS.as_str()))
-        .body(reqwest::Body::from(attachment.get_data_owned()));
+        .body(reqwest::blocking::Body::from(attachment.get_data_owned()));
 
-    let resp = req.send().await;
+    let resp = req.send();
     if let Err(e) = resp {
         if e.is_timeout() {
             log::error!("Request to server timed out...: {}", e.to_string());
@@ -71,17 +69,16 @@ async fn send_attachment(
     }
 
     let resp = resp.unwrap();
-    let bytes = &resp.bytes().await?;
-    let resp_str = std::str::from_utf8(bytes)?;
+    let body = resp.text()?;
 
-    log::info!("{}", resp_str);
+    log::info!("{}", body);
 
     Ok(())
 }
 
 /// Transmit this email to the Vaulty processing server
-async fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(), Error> {
-    let client = reqwest::Client::builder()
+fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(), Error> {
+    let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(REQUEST_TIMEOUT))
         .build()
         .unwrap();
@@ -90,10 +87,9 @@ async fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(
     let req = client
         .post(&format!("http://{}:7777/postfix/email", remote_addr))
         .basic_auth(VAULTY_USER.as_str(), Some(VAULTY_PASS.as_str()))
-        .body(reqwest::Body::from(email));
+        .body(reqwest::blocking::Body::from(email));
 
-    let resp = req.send().await;
-
+    let resp = req.send();
     if let Err(e) = resp {
         if e.is_timeout() {
             log::error!("Request to server timed out...: {}", e.to_string());
@@ -107,7 +103,7 @@ async fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(
     let status = resp.status();
     let is_success = status.is_success();
 
-    let body = &resp.text().await?;
+    let body = &resp.text()?;
 
     if !is_success {
         // TODO: Handle all possible error codes
@@ -124,23 +120,20 @@ async fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(
 
     let attachments = mail.attachments.take();
 
+    // Send each attachment one at a time
     if let Some(attachments) = attachments {
-        // 1. Create an iterator of `Future<Result<_, _>>`
-        // 2. Collect the futures in a `FuturesUnordered`
-        // 3. Collect the results into a `Vec`
-        attachments
-            .into_iter()
-            .map(|a| send_attachment(&remote_addr, &client, &mail, a))
-            .collect::<FuturesUnordered<_>>()
-            .collect::<Vec<_>>()
-            .await;
+        for a in attachments.into_iter() {
+            match send_attachment(&remote_addr, &client, &mail, a) {
+                Err(e) => log::error!("Failed to send this attachment: {}", e.to_string()),
+                Ok(_) => (),
+            }
+        }
     }
 
     Ok(())
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let remote_addr = match env::var("VAULTY_SERVER_ADDR") {
         Ok(v) => v,
         Err(_) => "127.0.0.1".to_string(),
@@ -153,9 +146,11 @@ async fn main() {
 
     // Get message body from stdin
     let mut email_content = String::new();
-    std::io::stdin()
-        .read_to_string(&mut email_content)
-        .expect("Failed to read email body from stdin!");
+    if let Err(e) = std::io::stdin().read_to_string(&mut email_content) {
+        // Message body is invalid for some reason - exit cleanly with a message
+        log::error!("Failed to read message from stdin: {}", e.to_string());
+        return;
+    }
 
     // Parse and process email
     let mut mail = vaulty::email::Email::from_mime(email_content.as_bytes())
@@ -165,7 +160,7 @@ async fn main() {
 
     // Process this email
     // If an error is encountered, we send a reply to the user
-    match process(&remote_addr, &mut mail).await {
+    match process(&remote_addr, &mut mail) {
         Err(e) => error::reply_with_error(&mail, e),
         Ok(_) => (),
     }
