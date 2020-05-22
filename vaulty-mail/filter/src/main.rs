@@ -146,9 +146,11 @@ fn main() {
 
     // Get message body from stdin
     let mut email_content = String::new();
-    std::io::stdin()
-        .read_to_string(&mut email_content)
-        .expect("Failed to read email body from stdin!");
+    if let Err(e) = std::io::stdin().read_to_string(&mut email_content) {
+        // Message body is invalid for some reason - exit cleanly with a message
+        log::error!("Failed to read message from stdin: {}", e.to_string());
+        return;
+    }
 
     // Parse and process email
     let mut mail = vaulty::email::Email::from_mime(email_content.as_bytes())
