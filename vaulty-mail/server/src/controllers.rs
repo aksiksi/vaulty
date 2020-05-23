@@ -29,6 +29,34 @@ pub mod postfix {
         mut db: sqlx::PgPool,
     ) -> Result<impl Reply, Rejection> {
         let mut db_client = vaulty::db::Client::new(&mut db);
+        let uuid = email.uuid.to_string();
+
+        // Build a generic success response
+        let result = Response::builder()
+            .body(format!("{}, {}", email.sender, uuid))
+            .map_err(|e| {
+                let err = Error::Generic(e.to_string());
+                warp::reject::custom(err)
+            });
+
+        // Check if this email is already in the cache
+        // This can occur in the case of the client retrying after a temporary
+        // failure (e.g., server timeout).
+        if email.num_attachments.is_some() {
+            let in_cache = {
+                let cache = MAIL_CACHE.read().await;
+                cache.contains_key(&uuid)
+            };
+
+            // Email found in cache, let's restore the attachment count to the
+            // original
+            if in_cache {
+                let mut cache = MAIL_CACHE.write().await;
+                let e = cache.get_mut(&uuid).unwrap();
+                e.email.num_attachments = email.num_attachments;
+                return result;
+            }
+        }
 
         // Get address information for the relevant recipient address
         // Use this to verify that user still has enough quota remaining
@@ -152,26 +180,13 @@ pub mod postfix {
         log::info!("{}", msg);
         db_client.log(&msg, Some(&email.uuid), LogLevel::Info).await;
 
-        let uuid = email.uuid.to_string();
-        let resp = Response::builder();
-
         log::info!("{}, {}", email.sender, uuid);
-
-        let result = resp
-            .body(format!("{}, {}", email.sender, uuid))
-            .map_err(|e| {
-                let err = Error::Generic(e.to_string());
-                warp::reject::custom(err)
-            });
 
         // Create a cache entry if email has attachments
         if let Some(_) = email.num_attachments {
             log::info!("Creating cache entry for {}", email.uuid);
 
-            let entry = CacheEntry {
-                email: email,
-                address: address,
-            };
+            let entry = CacheEntry { email, address };
 
             let mut cache = MAIL_CACHE.write().await;
             cache.insert(uuid.clone(), entry);
