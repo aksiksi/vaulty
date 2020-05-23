@@ -20,7 +20,7 @@ pub struct Email {
     pub size: usize,
 
     /// Number of attachments, if any
-    pub num_attachments: Option<usize>,
+    pub num_attachments: usize,
 
     /// List of attachments, if any
     ///
@@ -98,11 +98,7 @@ impl Email {
             // Assign email's UUID to this attachment
             attachment.data_mut().email_id = self.uuid;
 
-            // If this is the first attachment, init the count to 1
-            match self.num_attachments.as_mut() {
-                Some(v) => *v += 1,
-                None => self.num_attachments = Some(1),
-            };
+            self.num_attachments += 1;
 
             // Add the attachment to the Vec, or construct a new Vec
             if let Some(v) = &mut self.attachments {

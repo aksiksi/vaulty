@@ -42,7 +42,7 @@ pub mod postfix {
         // Check if this email is already in the cache
         // This can occur in the case of the client retrying after a temporary
         // failure (e.g., server timeout).
-        if email.num_attachments.is_some() {
+        if email.num_attachments > 0 {
             let in_cache = {
                 let cache = MAIL_CACHE.read().await;
                 cache.contains_key(&uuid)
@@ -183,7 +183,7 @@ pub mod postfix {
         log::info!("{}, {}", email.sender, uuid);
 
         // Create a cache entry if email has attachments
-        if let Some(_) = email.num_attachments {
+        if email.num_attachments > 0 {
             log::info!("Creating cache entry for {}", email.uuid);
 
             let entry = CacheEntry { email, address };
@@ -225,7 +225,7 @@ pub mod postfix {
         {
             let mut cache = MAIL_CACHE.write().await;
             let e = &mut cache.get_mut(&mail_id).unwrap();
-            let attachment_count = e.email.num_attachments.as_mut().unwrap();
+            let attachment_count = &mut e.email.num_attachments;
 
             *attachment_count -= 1;
 

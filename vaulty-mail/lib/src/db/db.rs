@@ -214,7 +214,6 @@ impl<'a> Client<'a> {
     /// Status and error message must be updated later
     pub async fn insert_email(&mut self, email: &Email) -> Result<(), sqlx::Error> {
         let email_id = &email.uuid;
-        let num_attachments = email.num_attachments.unwrap_or(0);
 
         // Recipient list will have been filtered down at this point
         let recipient = &email.recipients[0];
@@ -232,7 +231,7 @@ impl<'a> Client<'a> {
         let _num_rows = sqlx::query(&query)
             .bind(recipient)
             .bind(email_id)
-            .bind(num_attachments as i32)
+            .bind(email.num_attachments as i32)
             .bind(total_size as i32)
             .bind(email.message_id.as_ref())
             .bind(creation_time)
