@@ -21,6 +21,10 @@ lazy_static! {
 // Request timeout, in seconds
 const REQUEST_TIMEOUT: u64 = 15;
 
+// Postfix filter error codes
+// Postfix will re-queue delivery of the email to this filter
+const TEMPFAIL: i32 = 75;
+
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "vaulty-filter",
@@ -160,8 +164,8 @@ fn main() {
 
     // Process this email
     // If an error is encountered, we send a reply to the user
-    match process(&remote_addr, &mut mail) {
+    std::process::exit(match process(&remote_addr, &mut mail) {
         Err(e) => error::reply_with_error(&mail, e),
-        Ok(_) => (),
-    }
+        Ok(_) => 0,
+    })
 }

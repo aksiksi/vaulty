@@ -42,7 +42,16 @@ impl From<std::str::Utf8Error> for Error {
 
 /// Send out a reply to the user containing a description of why their email
 /// was not processed correctly.
-pub fn reply_with_error(mail: &vaulty::email::Email, err: Error) {
+pub fn reply_with_error(mail: &vaulty::email::Email, err: Error) -> i32 {
+    // If this was unexpected server error (e.g., timeout), then tell Postfix
+    // to retry delivery of this email to the filter.
+    // Do not inform the user about this.
+    // TODO: Record a metric for such failures to help debug issues when
+    // they arise.
+    if let Error::Unexpected = err {
+        return super::TEMPFAIL;
+    }
+
     let body = format!(
         "Vaulty encountered an error while processing this email:\n\n{}",
         err.to_string()
@@ -50,7 +59,7 @@ pub fn reply_with_error(mail: &vaulty::email::Email, err: Error) {
 
     if mail.message_id.is_none() {
         // We cannot reply to a message with no Message-ID!
-        return;
+        return 0;
     }
 
     // Build a Message-ID surrounded by <>
@@ -96,4 +105,6 @@ pub fn reply_with_error(mail: &vaulty::email::Email, err: Error) {
     } else {
         log::error!("Could not send email: {:?}", result);
     }
+
+    return 0;
 }
