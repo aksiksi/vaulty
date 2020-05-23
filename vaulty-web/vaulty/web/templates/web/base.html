@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.8.0/css/bulma.min.css" integrity="sha256-D9M5yrVDqFlla7nlELDaYZIpXfFWDytQtiV+TaH6F1I=" crossorigin="anonymous" />
   </head>
 
-<nav class="navbar" role="navigation" aria-label="main navigation">
+<nav class="navbar is-primary" role="navigation" aria-label="main navigation">
   <div class="navbar-brand">
     <a class="navbar-item" href="/">
       <img src="{% static 'header.png' %}" width="91" height="28">
@@ -26,39 +26,9 @@
   </div>
 
   <div id="vaulty-navbar" class="navbar-menu">
-    <div class="navbar-start">
-      <a class="navbar-item">
-        Home
-      </a>
+    {% block navbar %}{% endblock %}
 
-      <a class="navbar-item">
-        Pricing
-      </a>
-
-      <a class="navbar-item">
-        FAQ
-      </a>
-
-      <div class="navbar-item has-dropdown is-hoverable">
-        <a class="navbar-link">
-          More
-        </a>
-
-        <div class="navbar-dropdown">
-          <a class="navbar-item">
-            About
-          </a>
-          <a class="navbar-item">
-            Contact
-          </a>
-          <hr class="navbar-divider">
-          <a class="navbar-item">
-            Report an issue
-          </a>
-        </div>
-      </div>
-    </div>
-
+    <!-- TODO: Display these if not logged in, else show link to profile and logout -->
     <div class="navbar-end">
       <div class="navbar-item">
         <div class="buttons">
@@ -79,6 +49,9 @@
 </body>
 
 <footer class="footer">
+  <div class="content has-text-centered">
+    <p>Privacy Policy - Test - Test 2 - Test 3 - Contact</p>
+  </div>
   <div class="content has-text-centered">
     <p>
       <strong>Vaulty</strong> by <a href="https://assil.me">Assil Ksiksi</a>

@@ -1,0 +1,53 @@
+{% extends "web/base.html" %}
+
+{% block title %}FAQ | Vaulty{% endblock %}
+
+{% block navbar %}
+<div class="navbar-start">
+  <a class="navbar-item" href="/">
+    Home
+  </a>
+
+  <a class="navbar-item" href="#pricing">
+    Pricing
+  </a>
+
+  <a class="navbar-item" href="/faq">
+    FAQ
+  </a>
+
+  <div class="navbar-item has-dropdown is-hoverable">
+    <a class="navbar-link">
+      More
+    </a>
+
+    <div class="navbar-dropdown">
+      <a class="navbar-item">
+        About
+      </a>
+      <a class="navbar-item">
+        Contact
+      </a>
+      <hr class="navbar-divider">
+      <a class="navbar-item">
+        Report an issue
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<section id="faq" class="section">
+  <div class="container">
+    <div class="content is-medium">
+      <h1>Hello!</h1>
+      <p>Yes!</p>
+      <h1>Hello!</h1>
+      <p>Yes!</p>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

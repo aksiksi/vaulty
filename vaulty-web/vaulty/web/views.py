@@ -9,6 +9,14 @@ def index(request):
     return render(request, "web/index.html", {"form": form})
 
 
+def pricing(request):
+    return render(request, "web/pricing.html")
+
+
+def faq(request):
+    return render(request, "web/faq.html")
+
+
 def mailing_list(request):
     if request.method == "POST":
         form = LandingEmailForm(request.POST)
