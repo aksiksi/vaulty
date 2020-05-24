@@ -60,6 +60,10 @@ fn send_attachment(
             vaulty::constants::VAULTY_ATTACHMENT_NAME,
             attachment.get_name(),
         )
+        .header(
+            vaulty::constants::VAULTY_ATTACHMENT_INDEX,
+            attachment.get_index(),
+        )
         .basic_auth(VAULTY_USER.as_str(), Some(VAULTY_PASS.as_str()))
         .body(reqwest::blocking::Body::from(attachment.get_data_owned()));
 

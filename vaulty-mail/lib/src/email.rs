@@ -20,7 +20,7 @@ pub struct Email {
     pub size: usize,
 
     /// Number of attachments, if any
-    pub num_attachments: usize,
+    pub num_attachments: u16,
 
     /// List of attachments, if any
     ///
@@ -72,6 +72,9 @@ pub struct AttachmentData {
     /// Attachment data, encoded using charset
     pub data: Vec<u8>,
 
+    /// Index of this attachment in the email
+    pub index: u16,
+
     /// Associated email's UUID
     pub email_id: uuid::Uuid,
 }
@@ -97,6 +100,7 @@ impl Email {
         if let Some(mut attachment) = Attachment::from_mime(part) {
             // Assign email's UUID to this attachment
             attachment.data_mut().email_id = self.uuid;
+            attachment.data_mut().index = self.num_attachments;
 
             self.num_attachments += 1;
 
@@ -184,17 +188,11 @@ impl Email {
     }
 
     pub fn with_sender(self, sender: String) -> Self {
-        Self {
-            sender: sender,
-            ..self
-        }
+        Self { sender, ..self }
     }
 
     pub fn with_recipients(self, recipients: Vec<String>) -> Self {
-        Self {
-            recipients: recipients,
-            ..self
-        }
+        Self { recipients, ..self }
     }
 }
 
@@ -257,7 +255,6 @@ impl Attachment {
                 return None;
             }
         };
-
         d.size = d.data.len();
         d.content_id = content_id;
 
@@ -296,6 +293,12 @@ impl Attachment {
     pub fn get_email_id(&self) -> &uuid::Uuid {
         match self {
             Attachment::Inline(d) | Attachment::Regular(d) => &d.email_id,
+        }
+    }
+
+    pub fn get_index(&self) -> u16 {
+        match self {
+            Attachment::Inline(d) | Attachment::Regular(d) => d.index,
         }
     }
 

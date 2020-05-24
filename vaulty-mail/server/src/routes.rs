@@ -56,9 +56,20 @@ pub fn attachment(
         .and(warp::filters::header::header::<String>(
             vaulty::constants::VAULTY_ATTACHMENT_NAME,
         ))
+        .and(warp::filters::header::header::<u16>(
+            vaulty::constants::VAULTY_ATTACHMENT_INDEX,
+        ))
         .and(warp::filters::body::stream())
-        .and_then(move |size, content_type, mail_id, name, body| {
-            controllers::postfix::attachment(size, content_type, mail_id, name, body, db.clone())
+        .and_then(move |size, content_type, mail_id, name, index, body| {
+            controllers::postfix::attachment(
+                size,
+                content_type,
+                mail_id,
+                name,
+                index,
+                body,
+                db.clone(),
+            )
         })
 }
 

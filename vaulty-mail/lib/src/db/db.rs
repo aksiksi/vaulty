@@ -30,9 +30,11 @@ impl From<i32> for LogLevel {
 pub struct Address {
     pub address: String,
     pub user_id: i32,
+    pub email_quota: i32,
+    pub num_received: i32,
     pub max_email_size: i32,
-    pub quota: i32,
-    pub received: i32,
+    pub storage_quota: i64,
+    pub storage_used: i64,
     pub storage_token: String,
     pub storage_backend: storage::Backend,
     pub storage_path: String,
@@ -84,15 +86,32 @@ impl Address {
         }
     }
 
-    /// Update address received email count
-    pub async fn update_received_count(&self, db_client: &mut Client<'_>) -> Result<(), Error> {
-        let query = format!(
-            "
+    /// Update address storage use for this address
+    pub async fn update_storage_used(
+        &self,
+        size: usize, // in bytes
+        email_received: bool,
+        db_client: &mut Client<'_>,
+    ) -> Result<(), Error> {
+        let query = if email_received {
+            format!(
+                "
             UPDATE {}
-            SET received = received + 1
+            SET storage_used = storage_used + {}, num_received = num_received + 1
             WHERE address = $1",
-            Self::TABLE_NAME
-        );
+                Self::TABLE_NAME,
+                size as i64,
+            )
+        } else {
+            format!(
+                "
+            UPDATE {}
+            SET storage_used = storage_used + {}
+            WHERE address = $1",
+                Self::TABLE_NAME,
+                size as i64
+            )
+        };
 
         let _num_rows = sqlx::query(&query)
             .bind(&self.address)
@@ -115,7 +134,7 @@ pub struct Client<'a> {
 impl<'a> Client<'a> {
     pub fn new(db: &'a mut sqlx::PgPool) -> Self {
         Client {
-            db: db,
+            db,
             user_table: "users".to_string(),
             address_table: "addresses".to_string(),
             email_table: "emails".to_string(),
@@ -167,9 +186,11 @@ impl<'a> Client<'a> {
             let address = Address {
                 address: data.get("address"),
                 user_id: data.get("user_id"),
+                email_quota: data.get("email_quota"),
+                num_received: data.get("num_received"),
                 max_email_size: data.get("max_email_size"),
-                quota: data.get("quota"),
-                received: data.get("received"),
+                storage_quota: data.get("storage_quota"),
+                storage_used: data.get("storage_used"),
                 storage_token: data.get("storage_token"),
                 storage_backend: data.get::<String, &str>("storage_backend").into(),
                 storage_path: data.get("storage_path"),

@@ -15,6 +15,9 @@ use super::error::Error;
 struct CacheEntry {
     pub email: email::Email,
     pub address: vaulty::db::Address,
+
+    // Stores the indices of successfully processed attachments for this email
+    pub attachments_processed: Vec<u16>,
 }
 
 lazy_static! {
@@ -48,12 +51,9 @@ pub mod postfix {
                 cache.contains_key(&uuid)
             };
 
-            // Email found in cache, let's restore the attachment count to the
-            // original
+            // Email body has already been processed, so let's bail out here
+            // Client will send us the attachments next
             if in_cache {
-                let mut cache = MAIL_CACHE.write().await;
-                let e = cache.get_mut(&uuid).unwrap();
-                e.email.num_attachments = email.num_attachments;
                 return result;
             }
         }
@@ -135,22 +135,31 @@ pub mod postfix {
         }
 
         // Verify that address quota is not exceeded with this email
-        let max_email_size = address.max_email_size as f32;
-        let is_mail_size_exceeded = email.size as f32 > max_email_size;
-        let is_quota_exceeded = (address.received + 1) > address.quota;
-        let reject = is_quota_exceeded || is_mail_size_exceeded;
+        // Quota is checked again on every attachment
+        let max_email_size = address.max_email_size;
+        let is_email_size_exceeded = email.size as i32 > max_email_size;
+        let is_storage_quota_exceeded =
+            (address.storage_used + email.size as i64) > address.storage_quota;
+        let is_email_quota_exceeded = (address.num_received + 1) > address.email_quota;
+        let reject = is_email_size_exceeded || is_storage_quota_exceeded || is_email_quota_exceeded;
 
         if reject {
-            let msg = if is_mail_size_exceeded {
+            let msg = if is_email_size_exceeded {
                 format!(
-                    "This email is larger than allowed for {}: maximum email size is {:.2} MB.",
+                    "This email is larger than allowed for {}: the maximum email size is {} MB.",
                     recipient,
-                    max_email_size / 1e6
+                    (max_email_size / 1_000_000),
+                )
+            } else if is_storage_quota_exceeded {
+                format!(
+                    "Address {} has hit its storage quota of {} MB for this period.",
+                    recipient,
+                    (address.storage_quota / 1_000_000)
                 )
             } else {
                 format!(
                     "Address {} has hit its quota of {} emails for this period.",
-                    recipient, address.quota,
+                    recipient, address.email_quota,
                 )
             };
 
@@ -166,10 +175,13 @@ pub mod postfix {
             return Err(warp::reject::custom(err));
         }
 
-        // Increment received email count for this address
+        // Increment received storage for the email body
         // If this fails, do not proceed with processing this email
         // TODO: Can we do this in a single transaction (merge with above)?
-        if let Err(e) = address.update_received_count(&mut db_client).await {
+        if let Err(e) = address
+            .update_storage_used(email.body.len(), true, &mut db_client)
+            .await
+        {
             let msg = e.to_string();
             log::error!("{}", msg);
             return Err(warp::reject::custom(Error::from(e)));
@@ -186,7 +198,11 @@ pub mod postfix {
         if email.num_attachments > 0 {
             log::info!("Creating cache entry for {}", email.uuid);
 
-            let entry = CacheEntry { email, address };
+            let entry = CacheEntry {
+                email,
+                address,
+                attachments_processed: Vec::new(),
+            };
 
             let mut cache = MAIL_CACHE.write().await;
             cache.insert(uuid.clone(), entry);
@@ -195,11 +211,19 @@ pub mod postfix {
         result
     }
 
+    /// Cleanup the cache entry for this email on any non-retryable error
+    /// The expectation is that the user will re-send the email if needed
+    async fn cleanup_cache_entry(mail_id: &str) {
+        let mut cache = MAIL_CACHE.write().await;
+        cache.remove(mail_id);
+    }
+
     pub async fn attachment(
         size: usize,
         _content_type: String,
         mail_id: String,
         name: String,
+        index: u16,
         body: impl Stream<Item = Result<impl Buf, warp::Error>> + Send + Sync + 'static,
         mut db: sqlx::PgPool,
     ) -> Result<impl Reply, Rejection> {
@@ -216,24 +240,23 @@ pub mod postfix {
         let email = &entry.email;
         let address = &entry.address;
 
+        // Figure out if we've already processed this attachment by checking
+        // the attachment index against the number of processed attachments
+        // If we've processed it, silently terminate here
+        if entry.attachments_processed.contains(&index) {
+            let msg = format!(
+                "Attachment {} has already been processed for email {}",
+                index, mail_id
+            );
+
+            log::info!("{}", msg);
+
+            return resp.body(msg).map_err(|_| warp::reject::reject());
+        }
+
         let recipient = &email.recipients[0];
         let msg = format!("Got attachment for recipient {}", recipient);
         db_client.log(&msg, Some(&email.uuid), LogLevel::Info).await;
-
-        // If this is the last attachment for this email, cleanup the cache
-        // entry. Get this done early to minimize the chance of leaking an entry.
-        {
-            let mut cache = MAIL_CACHE.write().await;
-            let e = &mut cache.get_mut(&mail_id).unwrap();
-            let attachment_count = &mut e.email.num_attachments;
-
-            *attachment_count -= 1;
-
-            if *attachment_count == 0 {
-                log::info!("Removing {} from cache", mail_id);
-                cache.remove(&mail_id);
-            }
-        }
 
         log::info!(
             "Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
@@ -242,6 +265,29 @@ pub mod postfix {
             size,
             mail_id
         );
+
+        // Check if processing this attachment will result in the user exceeding
+        // their quota. We need to check again here because another email may have been
+        // processed in between (e.g., this email has been retried).
+        let is_quota_exceeded = (address.storage_used + size as i64) > address.storage_quota;
+        if is_quota_exceeded {
+            let msg = format!(
+                "Address {} has hit its quota of {} MB for this period.",
+                recipient,
+                (address.storage_quota / 1_000_000)
+            );
+
+            log::warn!("{}", msg);
+
+            db_client
+                .log(&msg, Some(&email.uuid), LogLevel::Warning)
+                .await;
+
+            db_client.update_email(&email, false, Some(&msg)).await;
+
+            let err = Error::QuotaExceeded(msg);
+            return Err(warp::reject::custom(err));
+        }
 
         let resp = resp
             .body(format!(
@@ -273,6 +319,31 @@ pub mod postfix {
         let resp = h
             .map(|_| resp)
             .map_err(|e| warp::reject::custom(Error::from(e)));
+
+        if resp.is_ok() {
+            if entry.attachments_processed.len() + 1 < email.num_attachments as usize {
+                // Update the cache entry
+                let mut cache = MAIL_CACHE.write().await;
+                let e = &mut cache.get_mut(&mail_id).unwrap();
+
+                e.attachments_processed.push(index);
+            } else {
+                // If this is the last attachment for this email, cleanup the cache
+                // entry.
+                log::info!("Removing {} from cache", mail_id);
+                cleanup_cache_entry(&mail_id).await;
+            }
+
+            // Update used storage for this attachment on success
+            if let Err(e) = address
+                .update_storage_used(size, false, &mut db_client)
+                .await
+            {
+                let msg = e.to_string();
+                log::error!("{}", msg);
+                return Err(warp::reject::custom(Error::from(e)));
+            }
+        }
 
         resp
     }

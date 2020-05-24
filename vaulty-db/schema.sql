@@ -23,9 +23,11 @@ CREATE TABLE addresses (
     user_id INTEGER REFERENCES users ON DELETE SET NULL,
     address TEXT NOT NULL,
     is_active BOOLEAN NOT NULL,
+    email_quota INTEGER NOT NULL, -- Max number of emails this address can receive
+    num_received INTEGER DEFAULT 0, -- Number of emails received in renewal period
     max_email_size INTEGER NOT NULL, -- Max size of a single email
-    quota INTEGER NOT NULL, -- Max number of emails in renewal period
-    received INTEGER DEFAULT 0, -- Emails received since last renewal
+    storage_quota BIGINT NOT NULL, -- Max storage quota in renewal period (in bytes)
+    storage_used BIGINT DEFAULT 0, -- Storage used in renewal period (in bytes)
     last_renewal_time TIMESTAMPTZ NOT NULL,
     storage_backend storage_backend NOT NULL,
     storage_token TEXT NOT NULL, -- Token for whichever provider is used
@@ -77,10 +79,10 @@ INSERT INTO users (email, password, is_subscribed, creation_time) VALUES
     ('def@abc.com', 'test123', TRUE, '2020-02-09 19:38:12-05:00');
 
 INSERT INTO addresses
-    (address, is_active, user_id, max_email_size, quota, last_renewal_time, creation_time, storage_backend, storage_token, storage_path, whitelist, is_whitelist_enabled) VALUES
-    ('info@vaulty.net', TRUE, (SELECT id FROM users WHERE email='abc@abc.com'), 20000000,
-     5000, '2020-02-09 19:38:12-05:00','2020-02-09 19:38:12-05:00', 'dropbox', '{{ vaulty_dropbox_token }}', '/vaulty', '{"cyph0nik@gmail.com"}', true),
-    ('admin@vaulty.net', TRUE, (SELECT id FROM users WHERE email='def@abc.com'), 20000000, 5000, '2020-02-09 19:38:12-05:00','2020-02-09 19:38:12-05:00', 'gdrive', 'testabc', '/vaulty/', NULL, false);
+    (address, is_active, user_id, email_quota, max_email_size, storage_quota, last_renewal_time, creation_time, storage_backend, storage_token, storage_path, whitelist, is_whitelist_enabled) VALUES
+    ('info@vaulty.net', TRUE, (SELECT id FROM users WHERE email='abc@abc.com'), 1000, 20000000,
+     20000000000, '2020-02-09 19:38:12-05:00','2020-02-09 19:38:12-05:00', 'dropbox', '{{ vaulty_dropbox_token }}', '/vaulty', '{"cyph0nik@gmail.com"}', true),
+    ('admin@vaulty.net', TRUE, (SELECT id FROM users WHERE email='def@abc.com'), 100, 20000000, 40000000, '2020-02-09 19:38:12-05:00','2020-02-09 19:38:12-05:00', 'gdrive', 'testabc', '/vaulty/', NULL, false);
 
 INSERT INTO emails (user_id, address_id, email_id, num_attachments,
                       total_size, status, error_msg, creation_time) VALUES
