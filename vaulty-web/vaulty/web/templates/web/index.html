@@ -43,8 +43,8 @@
     <div class="container">
       <div class="columns">
         <div class="column is-two-thirds">
-          <h1 class="title is-1">Email stuff to cloud storage, <strong>securely</strong></h1>
-          <h2 class="subtitle">You get your very own @vaulty.net address. Any emails and attachments you send to it are stored directly into your cloud storage account. We never see any of your email content.</h1>
+          <h1 class="title is-1">Email stuff to cloud storage, <em>securely</em></h1>
+          <p class="subtitle">Closed beta is coming soon! Enter your email below to stay updated.</p>
           <div id="mailing-list" style="margin-right: 10%;">
             <form method="POST" action="/mailing-list">
               {% csrf_token %}
@@ -89,26 +89,64 @@
   </div>
 </section>
 
+<section id="features" class="section">
+  <div class="container">
+    <div class="columns is-centered">
+      <h1 class="title is-3">Vaulty has your back.</h1>
+    </div>
+    <br />
+    <div class="columns">
+      <div class="column is-one-quarter">
+        <div class="content">
+          <h4>Store email content and attachments</h4>
+          <p>Any email you send to your Vaulty address is immediately forwarded to your cloud storage account. Currently, we only support Dropbox, but Google Drive and S3 are coming soon.</p>
+        </div>
+      </div>
+      <div class="column is-one-quarter">
+        <div class="content">
+          <h4>Sender whitelisting, by default</h4>
+          <p>You can set a list of whitelisted sender addresses for each Vaulty address. Any email received from an address that is not on the whitelist is rejected.</p>
+        </div>
+      </div>
+      <div class="column is-one-quarter">
+        <div class="content">
+          <h4>TLS encryption for all emails</h4>
+          <p>All emails you send to our mail servers are TLS encrypted, provided your mail client supports TLS, of course.</p>
+        </div>
+      </div>
+      <div class="column is-one-quarter">
+        <div class="content">
+          <h4>Customize your Vaulty address</h4>
+          <p>With the Premium plan, you get to choose a custom Vaulty address, so you can say goodbye to memorizing a randomly generated email address!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="how" class="section">
   <div class="container">
-    <h1 class="title is-2">How does it work?</h1>
+    <div class="columns is-centered">
+      <h1 class="title is-3">So, how does this all work?</h1>
+    </div>
+    <br />
     <div class="columns">
-      <div class="column one-third">
-        <div class="content is-medium">
-          <h3>Step 1</h2>
+      <div class="column is-one-third">
+        <div class="content">
+          <h3>Step 1</h3>
           <p>You create a Vaulty account and link it to one or more cloud storage services, and optionally configure where and how your email content is stored.</p>
         </div>
       </div>
-      <div class="column one-third">
-        <div class="content is-medium">
+      <div class="column is-one-third">
+        <div class="content">
           <h3>Step 2</h3>
           <p>We provide you with your own, unique Vaulty email address for each cloud storage service (@vaulty.net).</p>
         </div>
       </div>
-      <div class="column one-third">
-        <div class="content is-medium">
+      <div class="column is-one-third">
+        <div class="content">
           <h3>Step 3</h3>
-          <p>Any email you send to your Vaulty address is <em>streamed</em> directly to the cloud storage service, which means that we <strong>never</strong> view or store the contents on our side.</p>
+          <p>Any email you send to your Vaulty address is <strong><em>streamed</em></strong> directly to the cloud storage service: we <strong>never</strong> view or store the contents on our side.</p>
         </div>
       </div>
     </div>
