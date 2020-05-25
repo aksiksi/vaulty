@@ -1,0 +1,29 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ vaulty_domain }};
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    server_name {{ vaulty_domain }};
+
+    listen [::]:443 ssl ipv6only=on; # managed by Certbot
+    listen 443 ssl; # managed by Certbot
+
+    ssl_certificate /etc/letsencrypt/live/{{ vaulty_domain }}/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/{{ vaulty_domain }}/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location /static/ {
+        root {{ vaulty_web_app_path }};
+    }
+
+    # Forward all requests to Gunicorn socket
+    location / {
+        include proxy_params;
+        proxy_pass http://unix:/run/gunicorn.sock;
+    }
+}

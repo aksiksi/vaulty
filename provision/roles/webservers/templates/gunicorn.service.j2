@@ -1,0 +1,18 @@
+[Unit]
+Description=Vaulty gunicorn daemon
+Requires=gunicorn.socket
+After=network.target
+
+[Service]
+EnvironmentFile={{ vaulty_config_path }}/vaulty_web.env
+User={{ vaulty_web_user }}
+Group={{ vaulty_web_group }}
+WorkingDirectory={{ vaulty_web_path }}/vaulty
+ExecStart={{ vaulty_web_venv_path }}/bin/gunicorn \
+          --access-logfile - \
+          --workers 3 \
+          --bind unix:/run/gunicorn.sock \
+          vaulty.wsgi:application
+
+[Install]
+WantedBy=multi-user.target

@@ -5,12 +5,10 @@
     state: present
   tags:
     - test
-- name: Install Python 3
+- name: Install pgsql-devel for psycopg2
   apt:
-    name: python3
+    name: libpq-dev
     state: present
-  tags:
-    - test
 - name: Install pip
   apt:
     name: python3-pip
@@ -23,13 +21,21 @@
     state: present
   tags:
     - test
-- name: Create group
+- name: Install certbot
+  apt:
+    name: certbot
+    state: present
+- name: Install certbot Nginx plugin
+  apt:
+    name: python-certbot-nginx
+    state: present
+- name: Create web group
   group:
     name: "{{ vaulty_web_group }}"
     state: present
   tags:
     - test
-- name: Create user
+- name: Create web user
   user:
     name: "{{ vaulty_web_user }}"
     groups: "sudo,{{ vaulty_web_group }}"
@@ -38,6 +44,20 @@
     state: present
   tags:
     - test
+- name: Create Vaulty config directory
+  file:
+    path: "{{ vaulty_config_path }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ vaulty_web_user }}"
+    group: "{{ vaulty_web_group }}"
+- name: Template vaulty web env file
+  template:
+    src: ../templates/vaulty_web.env.j2
+    dest: "{{ vaulty_config_path }}/vaulty_web.env"
+    owner: "{{ vaulty_web_user }}"
+    group: "{{ vaulty_web_group }}"
+    mode: u=rw,g=r,o=r
 - name: Pull vaulty repo
   git:
     repo: "{{ vaulty_repo }}"
@@ -56,6 +76,13 @@
     recurse: yes
   tags:
     - test
+- name: Symlink web repo path
+  file:
+    src: "{{ vaulty_web_repo_path }}/vaulty-web"
+    dest: "{{ vaulty_web_path }}"
+    owner: "{{ vaulty_web_user }}"
+    group: "{{ vaulty_web_group }}"
+    state: link
 - name: Create virtualenv
   become: yes
   become_user: "{{ vaulty_web_user }}"
@@ -66,19 +93,60 @@
     - test
 - name: Install Python packages
   pip:
-    requirements: "{{ vaulty_web_code_path }}/requirements.txt"
+    requirements: "{{ vaulty_web_path }}/requirements.txt"
     virtualenv: "{{ vaulty_web_venv_path }}"
   tags:
     - test
     - update
-- name: Install certbot
-  apt:
-    name: certbot
-    state: present
-- name: Install certbot Nginx plugin
-  apt:
-    name: python-certbot-nginx
-    state: present
+# - name: Run Django migrations
+#   command:
+#     cmd: "{{ vaulty_web_venv_python }} {{ vaulty_web_app_path }}/manage.py makemigrations"
+# - name: Migrate
+#   command:
+#     cmd: "{{ vaulty_web_venv_python }} {{ vaulty_web_app_path }}/manage.py migrate"
+# - name: Create superuser using env variables
+#   command:
+#     cmd: "{{ vaulty_web_venv_python }} {{ vaulty_web_app_path }}/manage.py createsuperuser --no-input"
+- name: Collect all static files
+  command:
+    cmd: "{{ vaulty_web_venv_python }} {{ vaulty_web_app_path }}/manage.py collectstatic --no-input"
+- name: Copy Gunicorn systemd socket
+  copy:
+    src: ../files/gunicorn.socket
+    dest: /etc/systemd/system/gunicorn.socket
+- name: Template Gunicorn systemd service
+  template:
+    src: ../templates/gunicorn.service.j2
+    dest: /etc/systemd/system/gunicorn.service
+    mode: u=rw,g=r,o=r
+- name: Enable Gunicorn service
+  systemd:
+    enabled: yes
+    name: gunicorn
+- name: Enable and start Gunicorn socket
+  systemd:
+    state: started
+    enabled: yes
+    name: gunicorn.socket
+- name: Restart Gunicorn service
+  systemd:
+    state: restarted
+    daemon_reload: yes
+    name: gunicorn.service
+- name: Template Nginx site config
+  template:
+    src: ../templates/nginx/vaulty.j2
+    dest: /etc/nginx/sites-available/vaulty
+    mode: u=rw,g=r,o=r
+- name: Enable the site in Nginx (symlink)
+  file:
+    src: /etc/nginx/sites-available/vaulty
+    dest: /etc/nginx/sites-enabled/vaulty
+    state: link
+- name: Restart Nginx
+  systemd:
+    state: restarted
+    name: nginx
 - name: Configure and enable certbot
   shell: |
     certbot --nginx -d "{{ vaulty_domain }}" -d "web.{{ vaulty_domain }}" --noninteractive --agree-tos -m "{{ vaulty_postmaster }}"

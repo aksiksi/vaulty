@@ -28,7 +28,7 @@ IS_PROD = "VAULTY_WEB_IS_PROD" in os.environ
 DEBUG = not IS_PROD
 
 # We only need localhost here as all requests will be proxied from Nginx
-ALLOWED_HOSTS = ["localhost"]
+ALLOWED_HOSTS = ["vaulty.net", "localhost"]
 
 # Application definition
 
