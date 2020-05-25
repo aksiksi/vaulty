@@ -31,7 +31,7 @@ class Address(models.Model):
         S3 = 's3'
 
     # TODO: Do we want this to cascade instead?
-    user_id = models.ForeignKey(User, models.SET_NULL, null=True)
+    user = models.ForeignKey(User, models.SET_NULL, null=True)
     address = models.CharField(max_length=255)
     is_active = models.BooleanField()
 
@@ -69,8 +69,8 @@ class Email(models.Model):
         db_table = "vaulty_emails"
 
     id = models.UUIDField(primary_key=True, unique=True, editable=False)
-    user_id = models.ForeignKey(User, models.CASCADE)
-    address_id = models.ForeignKey(Address, models.CASCADE)
+    user = models.ForeignKey(User, models.CASCADE)
+    address = models.ForeignKey(Address, models.CASCADE)
     message_id = models.TextField(null=True) # Standard MIME Message-ID
     num_attachments = models.IntegerField()
     total_size = models.IntegerField()
@@ -87,7 +87,7 @@ class Log(models.Model):
         db_table = "vaulty_logs"
 
     creation_time = models.DateTimeField(auto_now_add=True)
-    email_id = models.ForeignKey(Email, models.CASCADE, null=True)
+    email = models.ForeignKey(Email, models.CASCADE, null=True)
     msg = models.TextField()
     log_level = models.IntegerField()
     creation_time = models.DateTimeField(auto_now_add=True)
