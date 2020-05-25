@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bytes::{buf::Buf, Bytes};
 use futures::stream::{self, FuturesUnordered, Stream, StreamExt, TryStreamExt};
 use lazy_static::lazy_static;
@@ -8,20 +6,12 @@ use warp::{self, http::Response, reply::Reply, Rejection};
 
 use vaulty::{db::LogLevel, email, mailgun};
 
+use super::cache::{Cache, CacheEntry};
 use super::error::Error;
 
-// Cache entry is cloneable to reduce read lock hold time
-#[derive(Clone)]
-struct CacheEntry {
-    pub email: email::Email,
-    pub address: vaulty::db::Address,
-
-    // Stores the indices of successfully processed attachments for this email
-    pub attachments_processed: Vec<u16>,
-}
-
 lazy_static! {
-    static ref MAIL_CACHE: RwLock<HashMap<String, CacheEntry>> = RwLock::new(HashMap::new());
+    /// Global mail cache
+    static ref MAIL_CACHE: RwLock<Cache> = RwLock::new(Cache::new());
 }
 
 pub mod postfix {
@@ -46,14 +36,9 @@ pub mod postfix {
         // This can occur in the case of the client retrying after a temporary
         // failure (e.g., server timeout).
         if email.num_attachments > 0 {
-            let in_cache = {
-                let cache = MAIL_CACHE.read().await;
-                cache.contains_key(&uuid)
-            };
-
             // Email body has already been processed, so let's bail out here
             // Client will send us the attachments next
-            if in_cache {
+            if MAIL_CACHE.read().await.contains(&uuid) {
                 return result;
             }
         }
@@ -103,28 +88,25 @@ pub mod postfix {
         email.recipients.retain(|r| r == recipient);
 
         // Ensure that sender address is whitelisted
-        // We scope this to avoid compiler nags about dyn Error
-        {
-            let valid = address.validate_sender(&email, &mut db_client).await;
-            if let Err(e) = valid {
-                let msg = e.to_string();
-                log::error!("{}", msg);
-                return Err(warp::reject::custom(Error::from(e)));
-            }
+        let valid = address.validate_sender(&email, &mut db_client).await;
+        if let Err(e) = valid {
+            let msg = e.to_string();
+            log::error!("{}", msg);
+            return Err(warp::reject::custom(Error::from(e)));
+        }
 
-            if !valid.unwrap() {
-                // Sender is not on the whitelist
-                // Fail gracefully...
-                log::warn!(
-                    "Rejecting email {:?} due to non-whitelisted sender",
-                    email.message_id
-                );
+        if !valid.unwrap() {
+            // Sender is not on the whitelist
+            // Fail gracefully...
+            log::warn!(
+                "Rejecting email {:?} due to non-whitelisted sender",
+                email.message_id
+            );
 
-                let err = Error::SenderNotWhitelisted {
-                    recipient: recipient.to_string(),
-                };
-                return Err(warp::reject::custom(err));
-            }
+            let err = Error::SenderNotWhitelisted {
+                recipient: recipient.to_string(),
+            };
+            return Err(warp::reject::custom(err));
         }
 
         // Insert this email into DB
@@ -202,20 +184,14 @@ pub mod postfix {
                 email,
                 address,
                 attachments_processed: Vec::new(),
+                insertion_time: None,
+                last_updated: None,
             };
 
-            let mut cache = MAIL_CACHE.write().await;
-            cache.insert(uuid.clone(), entry);
+            MAIL_CACHE.write().await.insert(uuid.clone(), entry);
         }
 
         result
-    }
-
-    /// Cleanup the cache entry for this email on any non-retryable error
-    /// The expectation is that the user will re-send the email if needed
-    async fn cleanup_cache_entry(mail_id: &str) {
-        let mut cache = MAIL_CACHE.write().await;
-        cache.remove(mail_id);
     }
 
     pub async fn attachment(
@@ -232,10 +208,19 @@ pub mod postfix {
 
         // Acquire cache read lock and clone email
         // This minimizes read lock time
-        let entry = {
-            let cache = MAIL_CACHE.read().await;
-            cache.get(&mail_id).unwrap().clone()
-        };
+        let entry = { MAIL_CACHE.read().await.get(&mail_id).map(|e| e.clone()) };
+
+        // We did not find an entry for this attachment...
+        if entry.is_none() {
+            let msg = format!(
+                "No entry found for one of the attachments (mail_id: {})",
+                mail_id
+            );
+            let err = Error::Generic(msg);
+            return Err(warp::reject::custom(err));
+        }
+
+        let entry = entry.unwrap();
 
         let email = &entry.email;
         let address = &entry.address;
@@ -323,15 +308,14 @@ pub mod postfix {
         if resp.is_ok() {
             if entry.attachments_processed.len() + 1 < email.num_attachments as usize {
                 // Update the cache entry
-                let mut cache = MAIL_CACHE.write().await;
-                let e = &mut cache.get_mut(&mail_id).unwrap();
-
-                e.attachments_processed.push(index);
+                let mut lock = MAIL_CACHE.write().await;
+                let entry = lock.get_mut(&mail_id).unwrap();
+                entry.attachments_processed.push(index);
             } else {
                 // If this is the last attachment for this email, cleanup the cache
                 // entry.
                 log::info!("Removing {} from cache", mail_id);
-                cleanup_cache_entry(&mail_id).await;
+                MAIL_CACHE.write().await.remove(&mail_id);
             }
 
             // Update used storage for this attachment on success

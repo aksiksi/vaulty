@@ -1,3 +1,4 @@
+mod cache;
 mod controllers;
 mod error;
 mod filters;
