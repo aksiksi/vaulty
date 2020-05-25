@@ -1,6 +1,7 @@
 use bytes::{buf::Buf, Bytes};
 use futures::stream::{self, FuturesUnordered, Stream, StreamExt, TryStreamExt};
 use lazy_static::lazy_static;
+use serde::Serialize;
 use tokio::sync::RwLock;
 use warp::{self, http::Response, reply::Reply, Rejection};
 
@@ -330,6 +331,34 @@ pub mod postfix {
         }
 
         resp
+    }
+}
+
+pub mod monitor {
+    use super::*;
+
+    #[derive(Serialize)]
+    struct CacheState {
+        num_processed: u64,
+        avg_processing_time: f32,
+    }
+
+    /// Returns a snapshot of the state of the cache
+    pub async fn cache(mut _db: sqlx::PgPool) -> Result<impl Reply, Rejection> {
+        let state = {
+            let cache = MAIL_CACHE.read().await;
+
+            CacheState {
+                num_processed: cache.num_processed,
+                avg_processing_time: cache.avg_processing_time,
+            }
+        };
+
+        let json = serde_json::to_string(&state).unwrap();
+
+        Response::builder()
+            .body(json)
+            .map_err(|_| warp::reject::reject())
     }
 }
 

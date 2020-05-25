@@ -26,7 +26,7 @@ pub async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> 
             "NOT FOUND".to_string(),
             StatusCode::NOT_FOUND,
         ))
-    } else if let Some(e) = err.find() {
+    } else if let Some(e) = err.find::<Error>() {
         match e {
             Error::Unauthorized => Ok(warp::reply::with_status(
                 "AUTH REQUIRED".to_string(),
@@ -56,6 +56,20 @@ pub async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> 
                 msg.clone(),
                 StatusCode::INTERNAL_SERVER_ERROR,
             )),
+        }
+    } else if let Some(e) = err.find::<warp::reject::MissingHeader>() {
+        let header_name = e.name();
+
+        if header_name == "Authorization" {
+            Ok(warp::reply::with_status(
+                format!("This endpoint requires authorization"),
+                StatusCode::UNAUTHORIZED,
+            ))
+        } else {
+            Ok(warp::reply::with_status(
+                format!("Missing the following header: {}", header_name),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ))
         }
     } else {
         Ok(warp::reply::with_status(

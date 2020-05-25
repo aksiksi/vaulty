@@ -88,7 +88,7 @@
 - name: Copy DB schema locally
   template:
     src: ../vaulty-db/schema.sql
-    dest: /tmp/
+    dest: ../tmp/
     mode: u=rw,g=rw,o=r
   delegate_to: localhost
   tags:

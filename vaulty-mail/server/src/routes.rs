@@ -73,6 +73,24 @@ pub fn attachment(
         })
 }
 
+/// Route for /monitor
+pub fn monitor(
+    db: sqlx::PgPool,
+    config: Arc<Config>,
+) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
+    cache(db.clone(), config.clone())
+}
+
+/// Route for /monitor/cache
+pub fn cache(
+    db: sqlx::PgPool,
+    _config: Arc<Config>,
+) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
+    warp::path!("monitor" / "cache")
+        .and(warp::path::end())
+        .and_then(move || controllers::monitor::cache(db.clone()))
+}
+
 /// Handles mail notifications from Mailgun
 pub fn mailgun(
     config: Arc<Config>,

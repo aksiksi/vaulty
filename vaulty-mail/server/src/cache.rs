@@ -8,10 +8,10 @@ pub struct Cache {
     cache: HashMap<String, CacheEntry>,
 
     /// Total number of entries processed
-    num_processed: u64,
+    pub num_processed: u64,
 
     /// Average processing time for cache entries, in microseconds
-    avg_processing_time: f32,
+    pub avg_processing_time: f32,
 }
 
 // Cache entry is cloneable to reduce read lock hold time

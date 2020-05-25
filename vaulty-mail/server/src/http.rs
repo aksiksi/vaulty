@@ -34,9 +34,10 @@ pub async fn run(arg: Config) {
 
     let mailgun = routes::mailgun(config.clone());
     let postfix = routes::postfix(pool.clone(), config.clone());
+    let monitor = routes::monitor(pool.clone(), config.clone());
     let index = routes::index();
 
-    let get = warp::get().and(index);
+    let get = warp::get().and(index.or(monitor));
     let post = warp::post().and(mailgun.or(postfix));
 
     let router = get.or(post).recover(error::handle_rejection);
