@@ -83,6 +83,11 @@
     owner: "{{ vaulty_web_user }}"
     group: "{{ vaulty_web_group }}"
     state: link
+- name: Copy env file to Django app directory
+  copy:
+    src: "{{ vaulty_config_path }}/vaulty_web.env"
+    dest: "{{ vaulty_web_app_path }}/.env"
+    remote_src: yes
 - name: Create virtualenv
   become: yes
   become_user: "{{ vaulty_web_user }}"
