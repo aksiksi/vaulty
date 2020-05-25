@@ -77,6 +77,9 @@ WSGI_APPLICATION = 'vaulty.wsgi.application'
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
 if IS_PROD:
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql_psycopg2',

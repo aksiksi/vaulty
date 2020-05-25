@@ -9,4 +9,4 @@ user = {{ vaulty_db_user }}
 dbname = {{ vaulty_db_name }}
 
 # Postfix 2.2 and later The SQL query template. See pgsql_table(5).
-query = SELECT is_active FROM addresses WHERE address='%s' AND is_active=true
+query = SELECT is_active FROM vaulty_addresses WHERE address='%s' AND is_active=true

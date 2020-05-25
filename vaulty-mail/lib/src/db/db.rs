@@ -135,10 +135,10 @@ impl<'a> Client<'a> {
     pub fn new(db: &'a mut sqlx::PgPool) -> Self {
         Client {
             db,
-            user_table: "users".to_string(),
-            address_table: "addresses".to_string(),
-            email_table: "emails".to_string(),
-            log_table: "logs".to_string(),
+            user_table: "vaulty_users".to_string(),
+            address_table: "vaulty_addresses".to_string(),
+            email_table: "vaulty_emails".to_string(),
+            log_table: "vaulty_logs".to_string(),
         }
     }
 
@@ -243,7 +243,7 @@ impl<'a> Client<'a> {
         let creation_time: DateTime<Utc> = Utc::now();
 
         let query = format!("
-            INSERT INTO {0} (user_id, address_id, email_id, num_attachments, total_size, message_id, creation_time) VALUES
+            INSERT INTO {0} (user_id, address_id, id, num_attachments, total_size, message_id, creation_time) VALUES
             ((SELECT user_id FROM {1} WHERE address = $1),
              (SELECT id FROM {1} WHERE address = $1), $2, $3, $4, $5, $6)",
             &self.email_table, &self.address_table

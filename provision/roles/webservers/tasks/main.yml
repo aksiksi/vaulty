@@ -98,15 +98,9 @@
   tags:
     - test
     - update
-# - name: Run Django migrations
-#   command:
-#     cmd: "{{ vaulty_web_venv_python }} {{ vaulty_web_app_path }}/manage.py makemigrations"
-# - name: Migrate
-#   command:
-#     cmd: "{{ vaulty_web_venv_python }} {{ vaulty_web_app_path }}/manage.py migrate"
-# - name: Create superuser using env variables
-#   command:
-#     cmd: "{{ vaulty_web_venv_python }} {{ vaulty_web_app_path }}/manage.py createsuperuser --no-input"
+- name: Run Django migrations
+  command:
+    cmd: "{{ vaulty_web_venv_python }} {{ vaulty_web_app_path }}/manage.py migrate"
 - name: Collect all static files
   command:
     cmd: "{{ vaulty_web_venv_python }} {{ vaulty_web_app_path }}/manage.py collectstatic --no-input"
