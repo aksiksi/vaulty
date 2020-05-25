@@ -334,17 +334,18 @@ pub mod postfix {
     }
 }
 
+/// JSON endpoints used to monitor server state
 pub mod monitor {
     use super::*;
 
-    #[derive(Serialize)]
-    struct CacheState {
-        num_processed: u64,
-        avg_processing_time: f32,
-    }
-
-    /// Returns a snapshot of the state of the cache
+    /// Returns a snapshot of mail cache state
     pub async fn cache(mut _db: sqlx::PgPool) -> Result<impl Reply, Rejection> {
+        #[derive(Serialize)]
+        struct CacheState {
+            num_processed: u64,
+            avg_processing_time: f32,
+        }
+
         let state = {
             let cache = MAIL_CACHE.read().await;
 
@@ -354,11 +355,7 @@ pub mod monitor {
             }
         };
 
-        let json = serde_json::to_string(&state).unwrap();
-
-        Response::builder()
-            .body(json)
-            .map_err(|_| warp::reject::reject())
+        Ok(warp::reply::json(&state))
     }
 }
 
