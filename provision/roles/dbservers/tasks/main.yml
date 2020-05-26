@@ -101,3 +101,18 @@
   tags:
     - test
     - update
+- name: Create PGSQL backup folder
+  file:
+    path: "/var/postgres/backups"
+    state: directory
+    mode: '0755'
+    owner: postgres
+    group: postgres
+- name: Create crontab to backup DB
+  become: yes
+  become_user: postgres
+  cron:
+    name: "Dump DB"
+    minute: "0"
+    hour: "0"
+    job: 'cd /var/postgres && pg_dump {{ vaulty_db_name }} | gzip > backups/vaulty_`date +\%y\%m\%d`.gz'
