@@ -86,7 +86,6 @@ class Log(models.Model):
     class Meta:
         db_table = "vaulty_logs"
 
-    creation_time = models.DateTimeField(auto_now_add=True)
     email = models.ForeignKey(Email, models.CASCADE, null=True)
     msg = models.TextField()
     log_level = models.IntegerField()

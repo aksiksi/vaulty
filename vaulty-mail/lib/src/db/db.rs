@@ -25,6 +25,12 @@ impl From<i32> for LogLevel {
     }
 }
 
+#[allow(dead_code)]
+const USER_TABLE: &str = "vaulty_users";
+const ADDRESS_TABLE: &str = "vaulty_addresses";
+const EMAIL_TABLE: &str = "vaulty_emails";
+const LOG_TABLE: &str = "vaulty_logs";
+
 /// Single address row in DB
 #[derive(Clone)]
 pub struct Address {
@@ -42,7 +48,7 @@ pub struct Address {
 }
 
 impl Address {
-    const TABLE_NAME: &'static str = "addresses";
+    const TABLE_NAME: &'static str = ADDRESS_TABLE;
 
     /// Validates sender address by checking that it is in the list of
     /// whitelisted senders for this recipient.
@@ -125,29 +131,16 @@ impl Address {
 /// Abstraction over sqlx DB client for Vaulty DB
 pub struct Client<'a> {
     pub db: &'a mut sqlx::PgPool,
-    pub user_table: String,
-    pub address_table: String,
-    pub email_table: String,
-    pub log_table: String,
 }
 
 impl<'a> Client<'a> {
     pub fn new(db: &'a mut sqlx::PgPool) -> Self {
-        Client {
-            db,
-            user_table: "vaulty_users".to_string(),
-            address_table: "vaulty_addresses".to_string(),
-            email_table: "vaulty_emails".to_string(),
-            log_table: "vaulty_logs".to_string(),
-        }
+        Client { db }
     }
 
     /// Convert a recipient email to a user ID
     pub async fn get_user_id(&mut self, recipient: &str) -> Result<i32, sqlx::Error> {
-        let query = format!(
-            "SELECT user_id FROM {} WHERE address = $1",
-            &self.address_table
-        );
+        let query = format!("SELECT user_id FROM {} WHERE address = $1", ADDRESS_TABLE);
 
         let row = sqlx::query(&query)
             .bind(recipient)
@@ -177,7 +170,7 @@ impl<'a> Client<'a> {
 
         let query = format!(
             "SELECT * FROM {} WHERE address IN ({})",
-            &self.address_table, &address_list
+            ADDRESS_TABLE, &address_list
         );
 
         let row = sqlx::query(&query).fetch_optional(self.db).await?;
@@ -214,15 +207,18 @@ impl<'a> Client<'a> {
         let query = format!(
             "
             INSERT INTO {0}
-            (email_id, msg, log_level) VALUES
-            ($1, $2, $3)",
-            &self.log_table
+            (email_id, msg, log_level, creation_time) VALUES
+            ($1, $2, $3, $4)",
+            LOG_TABLE
         );
+
+        let creation_time: DateTime<Utc> = Utc::now();
 
         let num_rows = sqlx::query(&query)
             .bind(email_id)
             .bind(msg)
             .bind(log_level as i32)
+            .bind(creation_time)
             .execute(self.db)
             .await;
 
@@ -241,12 +237,13 @@ impl<'a> Client<'a> {
 
         let total_size = email.size;
         let creation_time: DateTime<Utc> = Utc::now();
+        let last_update_time: DateTime<Utc> = Utc::now();
 
         let query = format!("
-            INSERT INTO {0} (user_id, address_id, id, num_attachments, total_size, message_id, creation_time) VALUES
+            INSERT INTO {0} (user_id, address_id, id, num_attachments, total_size, message_id, status, error_msg, last_update_time, creation_time) VALUES
             ((SELECT user_id FROM {1} WHERE address = $1),
-             (SELECT id FROM {1} WHERE address = $1), $2, $3, $4, $5, $6)",
-            &self.email_table, &self.address_table
+             (SELECT id FROM {1} WHERE address = $1), $2, $3, $4, $5, $6, $7, $8, $9)",
+            EMAIL_TABLE, ADDRESS_TABLE
         );
 
         let _num_rows = sqlx::query(&query)
@@ -255,6 +252,9 @@ impl<'a> Client<'a> {
             .bind(email.num_attachments as i32)
             .bind(total_size as i32)
             .bind(email.message_id.as_ref())
+            .bind(true)
+            .bind("")
+            .bind(last_update_time)
             .bind(creation_time)
             .execute(self.db)
             .await?;
@@ -272,7 +272,7 @@ impl<'a> Client<'a> {
             UPDATE {}
             SET status = $1, error_msg = $2
             WHERE email_id = $3",
-            &self.email_table
+            EMAIL_TABLE
         );
 
         let num_rows = sqlx::query(&query)
