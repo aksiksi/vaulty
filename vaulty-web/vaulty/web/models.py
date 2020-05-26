@@ -101,3 +101,9 @@ class Alias(models.Model):
 
     # Email will be forwarded to this address or local user
     dest = models.TextField()
+
+
+class LaunchMailingList(models.Model):
+    """Tracks users who signed up for launch mailing list."""
+    email = models.CharField(max_length=255)
+    creation_time = models.DateTimeField(auto_now_add=True)

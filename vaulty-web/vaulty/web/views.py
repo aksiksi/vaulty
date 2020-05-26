@@ -1,11 +1,11 @@
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotAllowed
 from django.shortcuts import render
 
-from .forms import LandingEmailForm
+from .forms import LaunchEmailForm
 
 
 def index(request):
-    form = LandingEmailForm()
+    form = LaunchEmailForm()
     return render(request, "web/index.html", {"form": form})
 
 
@@ -19,10 +19,9 @@ def faq(request):
 
 def mailing_list(request):
     if request.method == "POST":
-        form = LandingEmailForm(request.POST)
+        form = LaunchEmailForm(request.POST)
         if form.is_valid():
-            data = form.cleaned_data
-            print(data["email"])
-            return HttpResponse("Done!")
+            form.save()
+            return render(request, "web/launch_confirm.html")
     else:
         return HttpResponseNotAllowed(["POST"])
