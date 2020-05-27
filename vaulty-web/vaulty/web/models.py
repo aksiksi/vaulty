@@ -8,13 +8,14 @@ class User(AbstractUser):
         db_table = "vaulty_users"
 
     is_subscribed = models.BooleanField()
-    payment_token = models.TextField(null=True)
+    payment_token = models.CharField(max_length=512, null=True)
     last_update_time = models.DateTimeField(auto_now=True)
 
 
 class Address(models.Model):
     class Meta:
         db_table = "vaulty_addresses"
+        verbose_name_plural = "Addresses"
 
     constraints = [
         models.UniqueConstraint(
@@ -30,7 +31,7 @@ class Address(models.Model):
 
     # TODO: Do we want this to cascade instead?
     user = models.ForeignKey(User, models.SET_NULL, null=True)
-    address = models.CharField(max_length=255)
+    address = models.CharField(max_length=512)
     is_active = models.BooleanField()
 
     # Max number of emails this address can receive
@@ -49,14 +50,14 @@ class Address(models.Model):
     storage_used = models.BigIntegerField(default=0)
     last_renewal_time = models.DateTimeField()
     storage_backend = models.CharField(max_length=30, choices=StorageBackend.choices)
-    storage_token = models.TextField()
+    storage_token = models.CharField(max_length=1000)
 
     # Path to store data (in valid backend format)
-    storage_path = models.TextField()
+    storage_path = models.CharField(max_length=1000)
 
     # Sender whitelisting
     is_whitelist_enabled = models.BooleanField()
-    whitelist = ArrayField(models.TextField())
+    whitelist = ArrayField(models.CharField(max_length=512))
 
     last_update_time = models.DateTimeField(auto_now=True)
     creation_time = models.DateTimeField(auto_now_add=True)
@@ -69,7 +70,7 @@ class Mail(models.Model):
     id = models.UUIDField(primary_key=True, unique=True, editable=False)
     user = models.ForeignKey(User, models.CASCADE)
     address = models.ForeignKey(Address, models.CASCADE)
-    message_id = models.TextField(null=True) # Standard MIME Message-ID
+    message_id = models.CharField(max_length=1000, null=True) # Standard MIME Message-ID
     num_attachments = models.IntegerField()
     total_size = models.IntegerField()
 
@@ -93,15 +94,17 @@ class Log(models.Model):
 class Alias(models.Model):
     class Meta:
         db_table = "vaulty_aliases"
+        verbose_name_plural = "Aliases"
 
-    is_active = models.BooleanField()
-    alias = models.TextField()
+    alias = models.CharField(max_length=255)
 
     # Email will be forwarded to this address or local user
-    dest = models.TextField()
+    dest = models.CharField(max_length=255)
+
+    is_active = models.BooleanField()
 
 
 class LaunchMailingList(models.Model):
     """Tracks users who signed up for launch mailing list."""
-    email_address = models.CharField(max_length=255)
+    email_address = models.CharField(max_length=512)
     creation_time = models.DateTimeField(auto_now_add=True)
