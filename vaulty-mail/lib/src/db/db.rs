@@ -28,7 +28,7 @@ impl From<i32> for LogLevel {
 #[allow(dead_code)]
 const USER_TABLE: &str = "vaulty_users";
 const ADDRESS_TABLE: &str = "vaulty_addresses";
-const EMAIL_TABLE: &str = "vaulty_emails";
+const MAIL_TABLE: &str = "vaulty_mail";
 const LOG_TABLE: &str = "vaulty_logs";
 
 /// Single address row in DB
@@ -201,13 +201,13 @@ impl<'a> Client<'a> {
     ///
     /// If this fails, we just log an error internally and proceed.
     ///
-    /// `email_id` is optional since we may insert logs before inserting an
+    /// `mail_id` is optional since we may insert logs before inserting an
     /// email (e.g., rejected email).
-    pub async fn log(&mut self, msg: &str, email_id: Option<&uuid::Uuid>, log_level: LogLevel) {
+    pub async fn log(&mut self, msg: &str, mail_id: Option<&uuid::Uuid>, log_level: LogLevel) {
         let query = format!(
             "
             INSERT INTO {0}
-            (email_id, msg, log_level, creation_time) VALUES
+            (mail_id, msg, log_level, creation_time) VALUES
             ($1, $2, $3, $4)",
             LOG_TABLE
         );
@@ -215,7 +215,7 @@ impl<'a> Client<'a> {
         let creation_time: DateTime<Utc> = Utc::now();
 
         let num_rows = sqlx::query(&query)
-            .bind(email_id)
+            .bind(mail_id)
             .bind(msg)
             .bind(log_level as i32)
             .bind(creation_time)
@@ -230,7 +230,7 @@ impl<'a> Client<'a> {
     /// Insert an email into DB
     /// Status and error message must be updated later
     pub async fn insert_email(&mut self, email: &Email) -> Result<(), sqlx::Error> {
-        let email_id = &email.uuid;
+        let mail_id = &email.uuid;
 
         // Recipient list will have been filtered down at this point
         let recipient = &email.recipients[0];
@@ -243,12 +243,12 @@ impl<'a> Client<'a> {
             INSERT INTO {0} (user_id, address_id, id, num_attachments, total_size, message_id, status, error_msg, last_update_time, creation_time) VALUES
             ((SELECT user_id FROM {1} WHERE address = $1),
              (SELECT id FROM {1} WHERE address = $1), $2, $3, $4, $5, $6, $7, $8, $9)",
-            EMAIL_TABLE, ADDRESS_TABLE
+            MAIL_TABLE, ADDRESS_TABLE
         );
 
         let _num_rows = sqlx::query(&query)
             .bind(recipient)
-            .bind(email_id)
+            .bind(mail_id)
             .bind(email.num_attachments as i32)
             .bind(total_size as i32)
             .bind(email.message_id.as_ref())
@@ -265,20 +265,20 @@ impl<'a> Client<'a> {
     /// Update email status (success or failure)
     /// We do not really care if this operation fails (best-effort)
     pub async fn update_email(&mut self, email: &Email, status: bool, msg: Option<&str>) {
-        let email_id = &email.uuid;
+        let mail_id = &email.uuid;
 
         let query = format!(
             "
             UPDATE {}
             SET status = $1, error_msg = $2
-            WHERE email_id = $3",
-            EMAIL_TABLE
+            WHERE mail_id = $3",
+            MAIL_TABLE
         );
 
         let num_rows = sqlx::query(&query)
             .bind(status)
             .bind(msg)
-            .bind(email_id)
+            .bind(mail_id)
             .execute(self.db)
             .await;
 

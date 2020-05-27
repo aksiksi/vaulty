@@ -30,6 +30,10 @@ DEBUG = not IS_PROD
 # We only need localhost here as all requests will be proxied from Nginx
 ALLOWED_HOSTS = ["vaulty.net", "localhost"]
 
+# Define a custom User model
+# This simply extends the regular Django user with extra fields
+AUTH_USER_MODEL = 'web.User'
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -76,28 +80,20 @@ WSGI_APPLICATION = 'vaulty.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': os.environ.get("VAULTY_WEB_DB_NAME", None),
+        'USER': os.environ.get("VAULTY_WEB_DB_USER", None),
+        'PASSWORD': os.environ.get("VAULTY_WEB_DB_PASS", ""),
+        'HOST': os.environ.get("VAULTY_WEB_DB_HOST", None),
+        'PORT': '',
+    }
+}
+
 if IS_PROD:
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SECURE = True
-
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql_psycopg2',
-            'NAME': os.environ.get("VAULTY_WEB_DB_NAME", None),
-            'USER': os.environ.get("VAULTY_WEB_DB_USER", None),
-            'PASSWORD': os.environ.get("VAULTY_WEB_DB_PASS", ""),
-            'HOST': os.environ.get("VAULTY_WEB_DB_HOST", None),
-            'PORT': '',
-        }
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-        }
-    }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/3.0/ref/settings/#auth-password-validators

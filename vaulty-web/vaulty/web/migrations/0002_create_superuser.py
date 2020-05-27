@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
 
     # Simple data migration that creates the superuser once the DB is setup
     def generate_superuser(apps, schema_editor):
-        from django.contrib.auth.models import User
+        from ..models import User
 
         # VAULTY_WEB_DB_NAME = os.environ.get('VAULTY_WEB_DB_NAME')
         DJANGO_SUPERUSER_USERNAME = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'vaulty')
@@ -22,7 +22,8 @@ class Migration(migrations.Migration):
         superuser = User.objects.create_superuser(
             username=DJANGO_SUPERUSER_USERNAME,
             email=DJANGO_SUPERUSER_EMAIL,
-            password=DJANGO_SUPERUSER_PASSWORD)
+            password=DJANGO_SUPERUSER_PASSWORD,
+            is_subscribed=False)
 
         superuser.save()
 

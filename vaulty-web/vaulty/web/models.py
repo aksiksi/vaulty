@@ -1,17 +1,15 @@
+from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
 
-class User(models.Model):
+class User(AbstractUser):
     class Meta:
         db_table = "vaulty_users"
 
-    email_address = models.CharField(max_length=255)
-    password = models.CharField(max_length=255)
     is_subscribed = models.BooleanField()
     payment_token = models.TextField(null=True)
     last_update_time = models.DateTimeField(auto_now=True)
-    creation_time = models.DateTimeField(auto_now_add=True)
 
 
 class Address(models.Model):
@@ -64,9 +62,9 @@ class Address(models.Model):
     creation_time = models.DateTimeField(auto_now_add=True)
 
 
-class Email(models.Model):
+class Mail(models.Model):
     class Meta:
-        db_table = "vaulty_emails"
+        db_table = "vaulty_mail"
 
     id = models.UUIDField(primary_key=True, unique=True, editable=False)
     user = models.ForeignKey(User, models.CASCADE)
@@ -86,7 +84,7 @@ class Log(models.Model):
     class Meta:
         db_table = "vaulty_logs"
 
-    email = models.ForeignKey(Email, models.CASCADE, null=True)
+    mail = models.ForeignKey(Mail, models.CASCADE, null=True)
     msg = models.TextField()
     log_level = models.IntegerField()
     creation_time = models.DateTimeField(auto_now_add=True)
@@ -105,5 +103,5 @@ class Alias(models.Model):
 
 class LaunchMailingList(models.Model):
     """Tracks users who signed up for launch mailing list."""
-    email = models.CharField(max_length=255)
+    email_address = models.CharField(max_length=255)
     creation_time = models.DateTimeField(auto_now_add=True)
