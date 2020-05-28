@@ -209,7 +209,29 @@ pub mod postfix {
 
         // Acquire cache read lock and clone email
         // This minimizes read lock time
-        let entry = { MAIL_CACHE.read().await.get(&mail_id).map(|e| e.clone()) };
+        let entry = {
+            let lock = MAIL_CACHE.read().await;
+
+            if let Some(entry) = lock.get(&mail_id) {
+                // Figure out if we've already processed this attachment by
+                // checking the attachment index against the number of processed
+                // attachments. If we've processed it, silently terminate here.
+                if entry.attachments_processed.contains(&index) {
+                    let msg = format!(
+                        "Attachment {} has already been processed for email {}",
+                        index, mail_id
+                    );
+
+                    log::info!("{}", msg);
+
+                    return resp.body(msg).map_err(|_| warp::reject::reject());
+                }
+
+                Some(entry.clone())
+            } else {
+                None
+            }
+        };
 
         // We did not find an entry for this attachment...
         if entry.is_none() {
@@ -225,20 +247,6 @@ pub mod postfix {
 
         let email = &entry.email;
         let address = &entry.address;
-
-        // Figure out if we've already processed this attachment by checking
-        // the attachment index against the number of processed attachments
-        // If we've processed it, silently terminate here
-        if entry.attachments_processed.contains(&index) {
-            let msg = format!(
-                "Attachment {} has already been processed for email {}",
-                index, mail_id
-            );
-
-            log::info!("{}", msg);
-
-            return resp.body(msg).map_err(|_| warp::reject::reject());
-        }
 
         let recipient = &email.recipients[0];
         let msg = format!("Got attachment for recipient {}", recipient);
