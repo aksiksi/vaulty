@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Address, Alias, User
+from .models import Address, Alias, User, LaunchMailingList
 
 
 class AddressAdmin(admin.ModelAdmin):
@@ -19,7 +19,12 @@ class AliasAdmin(admin.ModelAdmin):
     list_filter = ("is_active", )
 
 
+class LaunchMailingListAdmin(admin.ModelAdmin):
+    date_hierarchy = "creation_time"
+
+
 # Register models in admin
+admin.site.register(User, UserAdmin)
 admin.site.register(Address, AddressAdmin)
 admin.site.register(Alias, AliasAdmin)
-admin.site.register(User, UserAdmin)
+admin.site.register(LaunchMailingList, LaunchMailingListAdmin)

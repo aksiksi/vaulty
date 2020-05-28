@@ -78,7 +78,12 @@
 # To test:
 # testsaslauthd -u "test" -r example.net -p "test"
 # See: http://www.postfix.org/SASL_README.html#auxprop_sasldb
-
+- name: Change ownership of SASL DB
+  file:
+    path: /etc/sasldb2
+    owner: postfix
+    group: sasl
+    mode: '0640'
 - name: Build "vaulty-filter" and "vaulty-server" (release)
   local_action:
     module: shell

@@ -1,6 +1,7 @@
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotAllowed
 from django.shortcuts import render
 
+from .email import launch_mailing_list_confirmation
 from .forms import LaunchEmailForm
 
 
@@ -22,6 +23,7 @@ def mailing_list(request):
         form = LaunchEmailForm(request.POST)
         if form.is_valid():
             form.save()
+            launch_mailing_list_confirmation(request, form)
             return render(request, "web/launch_confirm.html")
     else:
         return HttpResponseNotAllowed(["POST"])
