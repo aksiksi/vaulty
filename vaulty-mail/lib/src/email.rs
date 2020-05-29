@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-pub const UUID_NAMESPACE: &str = "vaulty.net";
+// Unique UUID namespace (URL + vaulty.net)
+const UUID_NAMESPACE: &str = "11d00b11-d9d0-5831-a6f7-8f88f86f870a";
 
 /// Represents a single parsed MIME email.
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
@@ -33,7 +35,7 @@ pub struct Email {
     /// UUID for this email
     ///
     /// This ties an email to its attachments.
-    pub uuid: uuid::Uuid,
+    pub uuid: Uuid,
 
     /// Message-ID for this email, if found
     pub message_id: Option<String>,
@@ -76,7 +78,7 @@ pub struct AttachmentData {
     pub index: u16,
 
     /// Associated email's UUID
-    pub email_id: uuid::Uuid,
+    pub email_id: Uuid,
 }
 
 impl Email {
@@ -175,7 +177,10 @@ impl Email {
         email.size = mime_content.len();
 
         // Assign a UUID to this email
-        email.uuid = uuid::Uuid::new_v4();
+        // The UUID is generated based on raw MIME content of the email
+        // This ensures that the UUID is always the same for the same email
+        let uuid = Uuid::parse_str(UUID_NAMESPACE)?;
+        email.uuid = Uuid::new_v5(&uuid, mime_content);
 
         // Parse mail headers
         // This will overwrite the UUID above if "Message-ID" is found
