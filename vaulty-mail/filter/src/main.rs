@@ -26,6 +26,7 @@ const REQUEST_TIMEOUT: u64 = 15;
 
 // Postfix filter error codes
 // Postfix will re-queue delivery of the email to this filter
+const UNAVAILABLE: i32 = 69;
 const TEMPFAIL: i32 = 75;
 
 #[derive(Debug, StructOpt)]
@@ -47,7 +48,7 @@ fn send_attachment(
     email: &vaulty::email::Email,
     attachment: vaulty::email::Attachment,
 ) -> Result<ServerResult, Error> {
-    log::info!(
+    log::debug!(
         "Processing attachment for email: {}",
         attachment.get_email_id().to_string()
     );
@@ -76,13 +77,13 @@ fn send_attachment(
             log::error!("Request to server timed out...: {}", e.to_string());
         }
 
-        return Err(Error::Unexpected);
+        return Err(Error::Temporary);
     }
 
     let resp = resp.unwrap();
     let result = resp.json::<ServerResult>()?;
 
-    log::info!("{:?}", result);
+    log::debug!("{:?}", result);
 
     Ok(result)
 }
@@ -106,7 +107,7 @@ fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<ServerR
             log::error!("Request to server timed out...: {}", e.to_string());
         }
 
-        return Err(Error::Unexpected);
+        return Err(Error::Temporary);
     }
 
     let resp = resp.unwrap();
@@ -120,11 +121,11 @@ fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<ServerR
         // TODO: Handle all possible error codes
         if status == StatusCode::UNPROCESSABLE_ENTITY {
             // Reject the email gracefully
-            log::info!("{:?}", result);
+            log::debug!("{:?}", result);
             return Err(Error::Server(result));
         } else {
             // Unexpected server error
-            log::error!(
+            log::debug!(
                 "Failed to process email {} with: \"{:?}\"",
                 mail.uuid,
                 result
@@ -141,7 +142,7 @@ fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<ServerR
 
         for (i, a) in attachments.into_iter().enumerate() {
             match send_attachment(&remote_addr, &client, &mail, a) {
-                Err(e) => log::error!("Failed to send attachment: {}", e.to_string()),
+                Err(e) => return Err(e),
                 Ok(r) => {
                     if i == num_attachments - 1 {
                         // The last attachment gets the final result
@@ -169,18 +170,32 @@ fn main() {
     // Init logger
     env_logger::builder().format_timestamp_micros().init();
 
+    // Parse input arguments
     let opt = Opt::from_args();
+
+    // If this is a delivery status notification (DSN), just ignore it
+    // See: Postfix pipe null_sender argument
+    if opt.sender == "" {
+        log::warn!("Received a bounced email notification... ignoring");
+        std::process::exit(0);
+    }
 
     // Get message body from stdin
     let mut email_content = String::new();
-    if let Err(e) = std::io::stdin().read_to_string(&mut email_content) {
+    if let Err(_) = std::io::stdin().read_to_string(&mut email_content) {
         // Message body is invalid for some reason - exit cleanly with a message
-        log::error!("Failed to read message from stdin: {}", e.to_string());
-        return;
+        println!("5.6.0: Failed to read mail body");
+        std::process::exit(UNAVAILABLE);
     }
 
-    // Parse and process email
-    let mut mail = vaulty::email::Email::from_mime(email_content.as_bytes())
+    // Try to parse this email
+    let result = vaulty::email::Email::from_mime(email_content.as_bytes());
+    if let Err(_) = result {
+        println!("5.6.0: Failed to parse mail body");
+        std::process::exit(UNAVAILABLE);
+    }
+
+    let mut mail = result
         .unwrap()
         .with_sender(opt.sender)
         .with_recipients(opt.recipients);
@@ -188,7 +203,7 @@ fn main() {
     // Process this email
     // If an error is encountered, we send a reply to the user
     std::process::exit(match process(&remote_addr, &mut mail) {
-        Err(e) => reply::reply_error(&mail, e),
+        Err(e) => reply::reply_error(e),
         Ok(r) => {
             if reply_on_success {
                 reply::reply_success(&mail, r)
