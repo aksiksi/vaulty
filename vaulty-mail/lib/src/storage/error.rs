@@ -1,9 +1,11 @@
 use std::error;
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 /// Error type for storage backends.
 /// Each type can store a message for logging purposes.
-#[derive(Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Error {
     UrlParseError(String),
     RequestTimeout,

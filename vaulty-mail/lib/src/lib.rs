@@ -2,6 +2,7 @@ use bytes::Bytes;
 use chrono::offset::Utc;
 use futures::stream::Stream;
 
+pub mod api;
 pub mod config;
 pub mod constants;
 pub mod db;

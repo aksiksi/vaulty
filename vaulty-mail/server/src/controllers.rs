@@ -3,7 +3,7 @@ use futures::stream::{self, FuturesUnordered, Stream, StreamExt, TryStreamExt};
 use lazy_static::lazy_static;
 use serde::Serialize;
 use tokio::sync::RwLock;
-use warp::{self, http::Response, reply::Reply, Rejection};
+use warp::{self, reply::Reply, Rejection};
 
 use vaulty::{db::LogLevel, email, mailgun};
 
@@ -25,23 +25,22 @@ pub mod postfix {
         let mut db_client = vaulty::db::Client::new(&mut db);
         let uuid = email.uuid.to_string();
 
-        // Build a generic success response
-        let result = Response::builder()
-            .body(format!("{}, {}", email.sender, uuid))
-            .map_err(|e| {
-                let err = Error::Generic(e.to_string());
-                warp::reject::custom(err)
-            });
+        // Result is successful by default
+        let mut result = vaulty::api::ServerResult {
+            success: true,
+            ..Default::default()
+        };
 
         // Check if this email is already in the cache
         // This can occur in the case of the client retrying after a temporary
         // failure (e.g., server timeout).
-        if email.num_attachments > 0 {
-            // Email body has already been processed, so let's bail out here
-            // Client will send us the attachments next
-            if MAIL_CACHE.read().await.contains(&uuid) {
-                return result;
-            }
+        if MAIL_CACHE.read().await.contains(&uuid) {
+            let msg = format!("Email {} has already been processed.", uuid);
+
+            log::info!("{}", msg);
+
+            result.message = Some(msg);
+            return Ok(warp::reply::json(&result));
         }
 
         // Get address information for the relevant recipient address
@@ -77,7 +76,7 @@ pub mod postfix {
                 log::warn!("{}", msg);
                 db_client.log(&msg, None, LogLevel::Warning).await;
 
-                let err = Error::InvalidRecipient;
+                let err = Error(vaulty::Error::InvalidRecipient);
                 return Err(warp::reject::custom(err));
             }
             Some(a) => a,
@@ -104,9 +103,9 @@ pub mod postfix {
                 email.message_id
             );
 
-            let err = Error::SenderNotWhitelisted {
+            let err = Error(vaulty::Error::SenderNotWhitelisted {
                 recipient: recipient.to_string(),
-            };
+            });
             return Err(warp::reject::custom(err));
         }
 
@@ -154,7 +153,7 @@ pub mod postfix {
 
             db_client.update_email(&email, false, Some(&msg)).await;
 
-            let err = Error::QuotaExceeded(msg);
+            let err = Error(vaulty::Error::QuotaExceeded(msg));
             return Err(warp::reject::custom(err));
         }
 
@@ -177,6 +176,10 @@ pub mod postfix {
 
         log::info!("{}, {}", email.sender, uuid);
 
+        // Send back a JSON result to the client containing all info
+        result.storage_backend = Some(address.storage_backend.clone());
+        result.num_attachments = Some(email.num_attachments as i32);
+
         // Create a cache entry if email has attachments
         if email.num_attachments > 0 {
             log::info!("Creating cache entry for {}", email.uuid);
@@ -192,7 +195,7 @@ pub mod postfix {
             MAIL_CACHE.write().await.insert(uuid.clone(), entry);
         }
 
-        result
+        Ok(warp::reply::json(&result))
     }
 
     pub async fn attachment(
@@ -204,7 +207,11 @@ pub mod postfix {
         body: impl Stream<Item = Result<impl Buf, warp::Error>> + Send + Sync + 'static,
         mut db: sqlx::PgPool,
     ) -> Result<impl Reply, Rejection> {
-        let resp = Response::builder();
+        let mut result = vaulty::api::ServerResult {
+            success: true,
+            ..Default::default()
+        };
+
         let mut db_client = vaulty::db::Client::new(&mut db);
 
         // Acquire cache read lock and clone email
@@ -223,8 +230,9 @@ pub mod postfix {
                     );
 
                     log::info!("{}", msg);
+                    result.message = Some(msg);
 
-                    return resp.body(msg).map_err(|_| warp::reject::reject());
+                    return Ok(warp::reply::json(&result));
                 }
 
                 Some(entry.clone())
@@ -239,7 +247,7 @@ pub mod postfix {
                 "No entry found for one of the attachments (mail_id: {})",
                 mail_id
             );
-            let err = Error::Generic(msg);
+            let err = Error(vaulty::Error::Generic(msg));
             return Err(warp::reject::custom(err));
         }
 
@@ -279,16 +287,9 @@ pub mod postfix {
 
             db_client.update_email(&email, false, Some(&msg)).await;
 
-            let err = Error::QuotaExceeded(msg);
+            let err = Error(vaulty::Error::QuotaExceeded(msg));
             return Err(warp::reject::custom(err));
         }
-
-        let resp = resp
-            .body(format!(
-                "Attachment name: {}, Recipient: {}, Size: {}, UUID: {}",
-                name, recipient, size, mail_id
-            ))
-            .unwrap();
 
         let handler = vaulty::EmailHandler::new(
             &address.storage_token,
@@ -311,31 +312,39 @@ pub mod postfix {
         }
 
         let resp = h
-            .map(|_| resp)
+            .map(|_| warp::reply::json(&result))
             .map_err(|e| warp::reject::custom(Error::from(e)));
 
-        if resp.is_ok() {
-            if entry.attachments_processed.len() + 1 < email.num_attachments as usize {
-                // Update the cache entry
-                let mut lock = MAIL_CACHE.write().await;
-                let entry = lock.get_mut(&mail_id).unwrap();
-                entry.attachments_processed.push(index);
-            } else {
-                // If this is the last attachment for this email, cleanup the cache
-                // entry.
-                log::info!("Removing {} from cache", mail_id);
-                MAIL_CACHE.write().await.remove(&mail_id);
-            }
+        // Bail out early if we failed
+        if resp.is_err() {
+            return resp;
+        }
 
-            // Update used storage for this attachment on success
-            if let Err(e) = address
-                .update_storage_used(size, false, &mut db_client)
-                .await
-            {
-                let msg = e.to_string();
-                log::error!("{}", msg);
-                return Err(warp::reject::custom(Error::from(e)));
-            }
+        // Update used storage for this attachment on success
+        if let Err(e) = address
+            .update_storage_used(size, false, &mut db_client)
+            .await
+        {
+            let msg = e.to_string();
+            log::error!("{}", msg);
+            return Err(warp::reject::custom(Error::from(e)));
+        }
+
+        // Finally, update the cache
+        if entry.attachments_processed.len() + 1 < email.num_attachments as usize {
+            // Update the cache entry
+            let mut lock = MAIL_CACHE.write().await;
+            let entry = lock.get_mut(&mail_id).unwrap();
+            entry.attachments_processed.push(index);
+        } else {
+            // If this is the last attachment for this email, cleanup the cache
+            // entry.
+            log::info!("Removing {} from cache", mail_id);
+            MAIL_CACHE.write().await.remove(&mail_id);
+
+            // Send back a JSON result to the client containing all info
+            result.storage_backend = Some(address.storage_backend.clone());
+            result.num_attachments = Some(email.num_attachments as i32);
         }
 
         resp

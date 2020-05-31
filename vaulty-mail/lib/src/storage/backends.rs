@@ -1,7 +1,9 @@
+use serde::{Deserialize, Serialize};
+
 /// List of supported storage backends
 /// This enum needs to be kept in sync with the PGSQL enum defined in the
 /// schema
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Backend {
     Dropbox,
     Gdrive,

@@ -19,7 +19,8 @@ pub fn basic_auth(config: Arc<Config>) -> BoxedFilter<()> {
             let full = format!("{}:{}", user, pass);
 
             if !auth.contains(&base64::encode(&full)) {
-                Err(warp::reject::custom(Error::Unauthorized))
+                let err = Error(vaulty::Error::Unauthorized);
+                Err(warp::reject::custom(err))
             } else {
                 Ok(())
             }

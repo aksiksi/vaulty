@@ -9,8 +9,11 @@ use reqwest::StatusCode;
 use structopt::StructOpt;
 
 mod error;
+mod reply;
 
 use error::Error;
+
+use vaulty::api::ServerResult;
 
 // TODO: Can we make this more flexible?
 lazy_static! {
@@ -43,7 +46,7 @@ fn send_attachment(
     client: &reqwest::blocking::Client,
     email: &vaulty::email::Email,
     attachment: vaulty::email::Attachment,
-) -> Result<(), Error> {
+) -> Result<ServerResult, Error> {
     log::info!(
         "Processing attachment for email: {}",
         attachment.get_email_id().to_string()
@@ -65,7 +68,7 @@ fn send_attachment(
             attachment.get_index(),
         )
         .basic_auth(VAULTY_USER.as_str(), Some(VAULTY_PASS.as_str()))
-        .body(reqwest::blocking::Body::from(attachment.get_data_owned()));
+        .body(attachment.get_data_owned());
 
     let resp = req.send();
     if let Err(e) = resp {
@@ -77,15 +80,15 @@ fn send_attachment(
     }
 
     let resp = resp.unwrap();
-    let body = resp.text()?;
+    let result = resp.json::<ServerResult>()?;
 
-    log::info!("{}", body);
+    log::info!("{:?}", result);
 
-    Ok(())
+    Ok(result)
 }
 
 /// Transmit this email to the Vaulty processing server
-fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(), Error> {
+fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<ServerResult, Error> {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(REQUEST_TIMEOUT))
         .build()
@@ -111,17 +114,21 @@ fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(), Err
     let status = resp.status();
     let is_success = status.is_success();
 
-    let body = &resp.text()?;
+    let mut result = resp.json::<ServerResult>()?;
 
     if !is_success {
         // TODO: Handle all possible error codes
         if status == StatusCode::UNPROCESSABLE_ENTITY {
             // Reject the email gracefully
-            log::info!("{}", body);
-            return Err(Error::Server(body.to_string()));
+            log::info!("{:?}", result);
+            return Err(Error::Server(result));
         } else {
             // Unexpected server error
-            log::error!("Failed to process email {} with: \"{}\"", mail.uuid, body);
+            log::error!(
+                "Failed to process email {} with: \"{:?}\"",
+                mail.uuid,
+                result
+            );
             return Err(Error::Unexpected);
         }
     }
@@ -130,21 +137,33 @@ fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<(), Err
 
     // Send each attachment one at a time
     if let Some(attachments) = attachments {
-        for a in attachments.into_iter() {
+        let num_attachments = attachments.len();
+
+        for (i, a) in attachments.into_iter().enumerate() {
             match send_attachment(&remote_addr, &client, &mail, a) {
-                Err(e) => log::error!("Failed to send this attachment: {}", e.to_string()),
-                Ok(_) => (),
+                Err(e) => log::error!("Failed to send attachment: {}", e.to_string()),
+                Ok(r) => {
+                    if i == num_attachments - 1 {
+                        // The last attachment gets the final result
+                        result = r;
+                    }
+                }
             }
         }
     }
 
-    Ok(())
+    Ok(result)
 }
 
 fn main() {
     let remote_addr = match env::var("VAULTY_SERVER_ADDR") {
         Ok(v) => v,
         Err(_) => "127.0.0.1".to_string(),
+    };
+
+    let reply_on_success = match env::var("VAULTY_REPLY_SUCCESS") {
+        Ok(_) => true,
+        Err(_) => false,
     };
 
     // Init logger
@@ -169,7 +188,13 @@ fn main() {
     // Process this email
     // If an error is encountered, we send a reply to the user
     std::process::exit(match process(&remote_addr, &mut mail) {
-        Err(e) => error::reply_with_error(&mail, e),
-        Ok(_) => 0,
+        Err(e) => reply::reply_error(&mail, e),
+        Ok(r) => {
+            if reply_on_success {
+                reply::reply_success(&mail, r)
+            } else {
+                0
+            }
+        }
     })
 }
