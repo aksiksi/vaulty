@@ -167,6 +167,30 @@ impl Email {
         }
     }
 
+    /// Generates a deterministic UUID for this email based on metadata.
+    /// The idea is that the UUID should be the same for the same email.
+    fn generate_uuid(&self) -> Uuid {
+        let mut buf = Vec::new();
+
+        if let Some(message_id) = &self.message_id {
+            buf.extend(message_id.as_bytes());
+        }
+
+        if let Some(subject) = &self.subject {
+            buf.extend(subject.as_bytes());
+        }
+
+        buf.extend(self.sender.as_bytes());
+
+        for r in &self.recipients {
+            buf.extend(r.as_bytes());
+        }
+
+        let uuid = Uuid::parse_str(UUID_NAMESPACE).unwrap();
+
+        Uuid::new_v5(&uuid, &buf)
+    }
+
     /// Convert a raw MIME email into structured format
     pub fn from_mime(mime_content: &[u8]) -> Result<Email, Box<dyn std::error::Error>> {
         let parsed = mailparse::parse_mail(mime_content)?;
@@ -176,18 +200,15 @@ impl Email {
         // Size of email, in bytes
         email.size = mime_content.len();
 
-        // Assign a UUID to this email
-        // The UUID is generated based on raw MIME content of the email
-        // This ensures that the UUID is always the same for the same email
-        let uuid = Uuid::parse_str(UUID_NAMESPACE)?;
-        email.uuid = Uuid::new_v5(&uuid, mime_content);
-
         // Parse mail headers
         // This will overwrite the UUID above if "Message-ID" is found
         email.parse_headers(&parsed);
 
         // Parse body and attachments
         email.parse_recursive(&parsed)?;
+
+        // Assign a deterministic UUID to this email
+        email.uuid = email.generate_uuid();
 
         Ok(email)
     }
@@ -405,6 +426,12 @@ mod test {
 
         assert_eq!(mail.body, "AAFAFAF\n\n");
         assert_eq!(mail.subject.unwrap(), "ABC");
+
+        // Verify the deterministic UUID
+        assert_eq!(
+            mail.uuid.to_string(),
+            "db6377b6-e9c2-5eb0-a4f7-b2ab8bc66042".to_string()
+        );
     }
 
     #[test]
