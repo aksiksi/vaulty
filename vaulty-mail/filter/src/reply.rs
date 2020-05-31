@@ -85,7 +85,7 @@ pub fn reply_error(err: Error) -> i32 {
     };
 
     if let Some(code) = status_code {
-        println!("{}: {}", code, err.to_string());
+        println!("{} {}", code, err.to_string());
         super::UNAVAILABLE
     } else {
         // If we're here, this email was successful?

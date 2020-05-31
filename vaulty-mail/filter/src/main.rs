@@ -26,6 +26,7 @@ const REQUEST_TIMEOUT: u64 = 15;
 
 // Postfix filter error codes
 // Postfix will re-queue delivery of the email to this filter
+// See: https://github.com/vdukhovni/postfix/blob/bfff4380a3b6fac2513c73531ee3a79212c08660/postfix/src/global/sys_exits.h#L31
 const UNAVAILABLE: i32 = 69;
 const TEMPFAIL: i32 = 75;
 
@@ -184,14 +185,17 @@ fn main() {
     let mut email_content = String::new();
     if let Err(_) = std::io::stdin().read_to_string(&mut email_content) {
         // Message body is invalid for some reason - exit cleanly with a message
-        println!("5.6.0: Failed to read mail body");
+        // NOTE(aksiksi): When providing DSN status code to Postfix, the code
+        // must end with either a space or EOF.
+        // See: https://github.com/vdukhovni/postfix/blob/bfff4380a3b6fac2513c73531ee3a79212c08660/postfix/src/global/dsn_util.c#L127
+        println!("5.6.0 Failed to read mail body");
         std::process::exit(UNAVAILABLE);
     }
 
     // Try to parse this email
     let result = vaulty::email::Email::from_mime(email_content.as_bytes());
     if let Err(_) = result {
-        println!("5.6.0: Failed to parse mail body");
+        println!("5.6.0 Failed to parse mail body");
         std::process::exit(UNAVAILABLE);
     }
 
