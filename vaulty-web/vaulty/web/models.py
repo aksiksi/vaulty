@@ -81,6 +81,18 @@ class Mail(models.Model):
     creation_time = models.DateTimeField(auto_now_add=True)
 
 
+class Attachment(models.Model):
+    class Meta:
+        db_table = "vaulty_attachments"
+
+    mail = models.ForeignKey(Mail, models.CASCADE)
+    index = models.IntegerField()
+    size = models.IntegerField()
+    status = models.BooleanField(default=True)
+    error_msg = models.TextField(null=True)
+    creation_time = models.DateTimeField(auto_now_add=True)
+
+
 class Log(models.Model):
     class Meta:
         db_table = "vaulty_logs"
@@ -96,7 +108,7 @@ class Alias(models.Model):
         db_table = "vaulty_aliases"
         verbose_name_plural = "Aliases"
 
-    alias = models.CharField(max_length=255)
+    alias = models.CharField(max_length=255, unique=True)
 
     # Email will be forwarded to this address or local user
     dest = models.CharField(max_length=255)
@@ -106,5 +118,5 @@ class Alias(models.Model):
 
 class LaunchMailingList(models.Model):
     """Tracks users who signed up for launch mailing list."""
-    email_address = models.CharField(max_length=512)
+    email_address = models.CharField(max_length=512, unique=True)
     creation_time = models.DateTimeField(auto_now_add=True)

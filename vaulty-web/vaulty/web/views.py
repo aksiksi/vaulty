@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotAllowed
 from django.shortcuts import render
 
@@ -25,5 +26,7 @@ def mailing_list(request):
             form.save()
             launch_mailing_list_confirmation(request, form)
             return render(request, "web/launch_confirm.html")
+        else:
+            return render(request, "web/index.html", {"form": form})
     else:
         return HttpResponseNotAllowed(["POST"])

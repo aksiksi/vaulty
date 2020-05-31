@@ -55,20 +55,23 @@
                   {% for field in form %}
                     <div class="field">
                       <p class="control has-icons-left has-icons-right is-expanded">
-                        {{ field.errors }}
-
                         {{ field }}
+
                         <span class="icon is-small is-left">
                           <i class="fas fa-envelope"></i>
                         </span>
 
-                        <!-- TODO: Toggle this if email check passes -->
-                        <span class="icon is-small is-right">
-                          <i class="fas fa-check"></i>
-                        </span>
+                        <!-- <!-1- TODO: Toggle this if email check passes -1-> -->
+                        <!-- <span class="icon is-small is-right"> -->
+                        <!--   <i class="fas fa-check"></i> -->
+                        <!-- </span> -->
 
                         {% if field.help_text %}
                         <p class="help">{{ field.help_text|safe }}</p>
+                        {% elif field.errors %}
+                            {% for error in field.errors %}
+                            <p class="help is-danger">{{ error|escape }}</p>
+                            {% endfor %}
                         {% endif %}
                       </p>
                     </div>

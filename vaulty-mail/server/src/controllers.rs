@@ -306,9 +306,14 @@ pub mod postfix {
         // If an error occurred while processing this attachment,
         // mark the email as failed
         if let Err(e) = h.as_ref() {
+            let msg = e.to_string();
+
+            // Insert failed attachment
             db_client
-                .update_email(&email, false, Some(&e.to_string()))
+                .insert_attachment(&email, index, size, false, Some(&msg))
                 .await;
+
+            db_client.update_email(&email, false, Some(&msg)).await;
         }
 
         let resp = h
@@ -319,6 +324,11 @@ pub mod postfix {
         if resp.is_err() {
             return resp;
         }
+
+        // Insert successful attachment into DB
+        db_client
+            .insert_attachment(&email, index, size, true, None)
+            .await;
 
         // Update used storage for this attachment on success
         if let Err(e) = address

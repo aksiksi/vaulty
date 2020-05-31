@@ -29,6 +29,7 @@ impl From<i32> for LogLevel {
 const USER_TABLE: &str = "vaulty_users";
 const ADDRESS_TABLE: &str = "vaulty_addresses";
 const MAIL_TABLE: &str = "vaulty_mail";
+const ATTACHMENT_TABLE: &str = "vaulty_attachments";
 const LOG_TABLE: &str = "vaulty_logs";
 
 /// Single address row in DB
@@ -138,28 +139,11 @@ impl<'a> Client<'a> {
         Client { db }
     }
 
-    /// Convert a recipient email to a user ID
-    pub async fn get_user_id(&mut self, recipient: &str) -> Result<i32, sqlx::Error> {
-        let query = format!("SELECT user_id FROM {} WHERE address = $1", ADDRESS_TABLE);
-
-        let row = sqlx::query(&query)
-            .bind(recipient)
-            .fetch_one(self.db)
-            .await?;
-
-        let user_id: i32 = row.get("user_id");
-
-        Ok(user_id)
-    }
-
     /// Convert a list of recipient emails into address info.
     ///
     /// This function will only return info for the **first** valid recipient
     /// email in the provided list.
-    pub async fn get_address(
-        &mut self,
-        recipients: &Vec<&str>,
-    ) -> Result<Option<Address>, sqlx::Error> {
+    pub async fn get_address(&mut self, recipients: &Vec<&str>) -> Result<Option<Address>, Error> {
         // Build a SQL list of values to check against
         // NOTE: This may need to be sanitizied
         let address_list = recipients
@@ -229,7 +213,7 @@ impl<'a> Client<'a> {
 
     /// Insert an email into DB
     /// Status and error message must be updated later
-    pub async fn insert_email(&mut self, email: &Email) -> Result<(), sqlx::Error> {
+    pub async fn insert_email(&mut self, email: &Email) -> Result<(), Error> {
         let mail_id = &email.uuid;
 
         // Recipient list will have been filtered down at this point
@@ -237,7 +221,7 @@ impl<'a> Client<'a> {
 
         let total_size = email.size;
         let creation_time: DateTime<Utc> = Utc::now();
-        let last_update_time: DateTime<Utc> = Utc::now();
+        let last_update_time = creation_time.clone();
 
         let query = format!("
             INSERT INTO {0} (user_id, address_id, id, num_attachments, total_size, message_id, status, error_msg, last_update_time, creation_time) VALUES
@@ -284,6 +268,43 @@ impl<'a> Client<'a> {
 
         if let Err(e) = num_rows {
             log::error!("Failed to update email: {}", e.to_string());
+        }
+    }
+    /// Insert an attachment into DB
+    /// Status and error message must be updated later
+    pub async fn insert_attachment(
+        &mut self,
+        email: &Email,
+        index: u16,
+        size: usize,
+        status: bool,
+        error_msg: Option<&str>,
+    ) {
+        let mail_id = &email.uuid;
+
+        let creation_time: DateTime<Utc> = Utc::now();
+
+        let query = format!(
+            "
+            INSERT INTO {0} (mail_id, index, size, status, error_msg, creation_time) VALUES
+             $1, $2, $3, $4, $5, $6, $7)",
+            ATTACHMENT_TABLE
+        );
+
+        let error_msg = error_msg.unwrap_or("");
+
+        let num_rows = sqlx::query(&query)
+            .bind(mail_id)
+            .bind(index as i32)
+            .bind(size as i32)
+            .bind(status)
+            .bind(error_msg)
+            .bind(creation_time)
+            .execute(self.db)
+            .await;
+
+        if let Err(e) = num_rows {
+            log::error!("Failed to insert attachment: {}", e.to_string());
         }
     }
 }
