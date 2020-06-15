@@ -35,6 +35,17 @@ jobs:
       git clone https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/aksiksi/vaulty-provision.git
     displayName: 'Pull Ansible playbooks repo'
 
+  # Install SSH key
+  - task: InstallSSHKey@0
+    inputs:
+      knownHostsEntry: mail.vaulty.net,104.248.225.238 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBOTKzBJzJnq/T31iPZiHAttYakYBW1Mo+H1LX1oVUWjPhRFP0c2+jzyKv4EtOGylpLVLyGlwAIhnZSKtZy6gFA0=
+      sshKeySecureFile: vaulty_key
+    displayName: 'Install SSH key'
+
+  - script: |
+      echo "web.vaulty.net,159.89.84.124 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJgq/cBWtYBcTBrvCpRLOcw69owJZD9OuUpseY14ifmv3tfn9Sw21ukANbOy/rsM5jvkFNDVTFnAlWlYFC6OWjU=" >> ~/.ssh/known_hosts
+    displayName: 'Add entry to known_hosts'
+
   # Deploy!
   - script: |
       cd vaulty-provision/
