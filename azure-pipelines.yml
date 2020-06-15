@@ -2,16 +2,41 @@ trigger:
   branches:
     include:
       - master
-  paths:
-    include:
-      - vaulty-mail
+  # paths:
+  #   include:
+  #     - vaulty-mail
 
 pool:
   vmImage: 'ubuntu-latest'
 
-steps:
-- script: |
-    cd vaulty-mail
-    cargo build
-    DROPBOX_TOKEN=$(DROPBOX_TOKEN) cargo test
-  displayName: 'Build vaulty and run tests'
+# TODO: Add step to test vaulty-web
+jobs:
+- job: Test
+  steps:
+  - script: |
+      cd vaulty-mail
+      cargo build
+      DROPBOX_TOKEN=$(DROPBOX_TOKEN) cargo test
+      cd ..
+    displayName: 'Build vaulty and run tests'
+
+- job: Deploy
+  dependsOn: Test
+  steps:
+  - script: |
+      sudo apt update
+      sudo apt install software-properties-common
+      sudo apt-add-repository --yes --update ppa:ansible/ansible
+      sudo apt install -y ansible
+    displayName: 'Install Ansible'
+
+  # Clone the Vaulty provision repo
+  - script: |
+      git clone https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/aksiksi/vaulty-provision.git
+    displayName: 'Pull Ansible playbooks repo'
+
+  # Deploy!
+  - script: |
+      cd vaulty-provision/
+      ansible-playbook -i inventory/dev.yml provision.yml
+    displayName: 'Deploy!'
