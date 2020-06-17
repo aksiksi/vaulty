@@ -15,7 +15,7 @@ jobs:
   steps:
   - script: |
       cd vaulty-mail
-      DROPBOX_TOKEN=$(DROPBOX_TOKEN) cargo test --release
+      DROPBOX_TOKEN=$(DROPBOX_TOKEN) cargo test
       cd ..
     displayName: 'Build vaulty and run tests'
 
