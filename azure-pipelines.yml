@@ -2,9 +2,9 @@ trigger:
   branches:
     include:
       - master
-  # paths:
-  #   include:
-  #     - vaulty-mail
+  paths:
+    include:
+      - vaulty-mail
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -18,35 +18,3 @@ jobs:
       DROPBOX_TOKEN=$(DROPBOX_TOKEN) cargo test
       cd ..
     displayName: 'Build vaulty and run tests'
-
-- job: Deploy
-  dependsOn: Test
-  steps:
-  - script: |
-      sudo apt update
-      sudo apt install software-properties-common
-      sudo apt-add-repository --yes --update ppa:ansible/ansible
-      sudo apt install -y ansible
-    displayName: 'Install Ansible'
-
-  # Clone the Vaulty provision repo
-  - script: |
-      git clone https://$(GITHUB_USER):$(GITHUB_TOKEN)@github.com/aksiksi/vaulty-provision.git
-    displayName: 'Pull Ansible playbooks repo'
-
-  # Install SSH key
-  - task: InstallSSHKey@0
-    inputs:
-      knownHostsEntry: mail.vaulty.net,104.248.225.238 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBOTKzBJzJnq/T31iPZiHAttYakYBW1Mo+H1LX1oVUWjPhRFP0c2+jzyKv4EtOGylpLVLyGlwAIhnZSKtZy6gFA0=
-      sshKeySecureFile: vaulty_key
-    displayName: 'Install SSH key'
-
-  - script: |
-      echo "web.vaulty.net,159.89.84.124 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJgq/cBWtYBcTBrvCpRLOcw69owJZD9OuUpseY14ifmv3tfn9Sw21ukANbOy/rsM5jvkFNDVTFnAlWlYFC6OWjU=" >> ~/.ssh/known_hosts
-    displayName: 'Add entry to known_hosts'
-
-  # Deploy!
-  - script: |
-      cd vaulty-provision/
-      ansible-playbook -i inventory/dev.yml provision.yml
-    displayName: 'Deploy!'
