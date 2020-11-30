@@ -158,15 +158,10 @@ fn process(remote_addr: &str, mail: &mut vaulty::email::Email) -> Result<ServerR
 }
 
 fn main() {
-    let remote_addr = match env::var("VAULTY_SERVER_ADDR") {
-        Ok(v) => v,
-        Err(_) => "127.0.0.1".to_string(),
-    };
+    let remote_addr = env::var("VAULTY_SERVER_ADDR")
+                                 .unwrap_or("127.0.0.1".to_string());
 
-    let reply_on_success = match env::var("VAULTY_REPLY_SUCCESS") {
-        Ok(_) => true,
-        Err(_) => false,
-    };
+    let reply_on_success = env::var("VAULTY_REPLY_SUCCESS").is_ok();
 
     // Init logger
     env_logger::builder().format_timestamp_micros().init();
